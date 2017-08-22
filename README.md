@@ -20,7 +20,7 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 * *Green* changes value
 * *Blue* changes speed
 * *Indigo* ?
-* *Purple* ?
+* *Violet* ?
 
 ## Mode
 
