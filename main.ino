@@ -21,6 +21,16 @@ Encoder encoder(PIN_ROTARY_ONE, PIN_ROTARY_TWO);
 /* This variable holds the LED color state. */
 CRGB leds[NUM_LEDS];
 
+/* All the different modes that are available. */
+#define MAX_MODES 1
+void modeSolid();
+void (*modes[MAX_MODES])() = {
+    &modeSolid
+};
+
+/* Currently active mode. */
+uint8_t activeMode = 0;
+
 /* Define the different parameters that can be changed using the rotary wheel. */
 #define PARAMETER_MODE 0
 #define PARAMETER_HUE 1
@@ -39,10 +49,10 @@ uint8_t parameters[MAX_PARAMETERS] = { 0, 0, 255, 80, 80, 0, 0 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
-uint8_t parameterMax[MAX_PARAMETERS] = { 1, 0, 0, 0, 0, 0, 0 };
+uint8_t parameterMax[MAX_PARAMETERS] = { MAX_MODES, 0, 0, 0, 0, 0, 0 };
 
 /* Rainbow colors, used to signify active parameter to the user. */
-CRGB rainbowColors[] = {
+CRGB rainbowColors[MAX_PARAMETERS] = {
     CHSV(0,   255, 255),
     CHSV(36,  255, 255),
     CHSV(73,  255, 255),
@@ -52,6 +62,7 @@ CRGB rainbowColors[] = {
     CHSV(219, 255, 255)
 };
 
+/* Initial setup, called once on boot. */
 void setup() {
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
@@ -91,6 +102,8 @@ int8_t rotary_delta() {
     return rval;
 }
 
+/* modeSolid draws a solid color across all LEDs, according to the parameters
+ * HUE, SATURATION, VALUE. */
 void modeSolid() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(
         parameters[PARAMETER_HUE],
@@ -117,7 +130,7 @@ void loop() {
     parameters[activeParameter] += rotary_delta();
     parameters[activeParameter] %= parameterMax[activeParameter];
 
-    /* Only one mode for now */
-    modeSolid();
+    /* Run the currently active mode. */
+    modes[activeMode]();
     FastLED.show();
 }
