@@ -30,10 +30,11 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 
 ### Mode
 
-* Solid color: displays a single color across all LEDs.
-* Solid rainbow: cycle through the color wheel, showing a single color.
-* Rainbow: color the LEDs with red to purple.
-* Temperature: white leds, tinted red or blue according to temperature.
+- *Temperature*: white leds, which are tinted red, yellow or blue.
+- *Solid color*: displays a single color across all LEDs.
+- *Solid rainbow*: cycle through the color wheel if animations are enabled,
+  showing a single color at a time.
+- *Rainbow*: color the LEDs with red to purple.
 
 ### Hue
 
@@ -56,6 +57,8 @@ with the formula being:
     wait_time = 1 second / speed
 
 If speed is zero, animations are disabled.
+
+The animation time ranges between 4-1000ms.
 
 ### Start position
 
