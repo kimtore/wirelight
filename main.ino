@@ -45,10 +45,10 @@ void (*modes[MAX_MODES])() = {
 #define MAX_PARAMETERS 7
 
 /* Holds the parameter that is currently changed using the rotary wheel. */
-uint8_t activeParameter = PARAMETER_MODE;
+uint8_t activeParameter = PARAMETER_SPEED;
 
 /* Holds the values of the different parameters. */
-uint8_t parameters[MAX_PARAMETERS] = { 1, 190, 255, 128, 5, 0, /*NUM_LEDS-1*/ 4 };
+uint8_t parameters[MAX_PARAMETERS] = { 2, 190, 255, 128, 5, 0, /*NUM_LEDS-1*/ 4 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
@@ -151,14 +151,14 @@ void fillSolid(uint8_t start, uint8_t end, CHSV color) {
 
     /* Contiguous block */
     if (end >= start) {
-        for (uint8_t led = start; led < end; led++) {
+        for (uint8_t led = start; led <= end; led++) {
             leds[led] = color;
         }
         return;
     }
 
     /* Split into two parts. Draw start first, then end. */
-    for (uint8_t led = 0; led < end; led++) {
+    for (uint8_t led = 0; led <= end; led++) {
         leds[led] = color;
     }
 
@@ -167,44 +167,52 @@ void fillSolid(uint8_t start, uint8_t end, CHSV color) {
     }
 }
 
-/* modeSolid draws a solid color across all LEDs, according to the parameters
- * HUE, SATURATION, VALUE. */
-void modeSolid() {
+/* animatedFill fills the portion of LEDs that should be lit up according to
+ * POSITION and SIZE. If an animation was triggered, return true. Otherwise,
+ * return false. */
+bool animatedFill(CHSV color) {
     static uint8_t animation_start = 0;
     uint8_t start;
 
     start = (animation_start + parameters[PARAMETER_POSITION]) % NUM_LEDS;
 
-    fillSolid(start, start + parameters[PARAMETER_SIZE], CHSV(
-        parameters[PARAMETER_HUE],
-        parameters[PARAMETER_SATURATION],
-        parameters[PARAMETER_VALUE]
-    ));
+    fillSolid(start, start + parameters[PARAMETER_SIZE], color);
 
     if (!stepAnimation()) {
-        return;
+        return false;
     }
 
     animation_start++;
     animation_start %= NUM_LEDS;
+
+    return true;
+}
+
+/* modeSolid draws a solid color across all LEDs, according to the parameters
+ * HUE, SATURATION, VALUE. */
+void modeSolid() {
+    animatedFill(CHSV(
+        parameters[PARAMETER_HUE],
+        parameters[PARAMETER_SATURATION],
+        parameters[PARAMETER_VALUE]
+    ));
 }
 
 /* modeSolidRainbow draws a solid color across all LEDs, animating it according
  * to the color wheel. */
 void modeSolidRainbow() {
     static uint8_t hue = 0;
+    bool animated;
 
-    fill_solid(&leds[0], NUM_LEDS, CHSV(
+    animated = animatedFill(CHSV(
         hue + parameters[PARAMETER_HUE],
         parameters[PARAMETER_SATURATION],
         parameters[PARAMETER_VALUE]
     ));
 
-    if (!stepAnimation()) {
-        return;
+    if (animated) {
+        hue++;
     }
-
-    hue++;
 }
 
 /* modeRainbow draws an animated rainbow across all LEDs. */
