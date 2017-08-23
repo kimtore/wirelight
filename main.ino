@@ -45,10 +45,10 @@ void (*modes[MAX_MODES])() = {
 #define MAX_PARAMETERS 7
 
 /* Holds the parameter that is currently changed using the rotary wheel. */
-uint8_t activeParameter = PARAMETER_SPEED;
+uint8_t activeParameter = PARAMETER_MODE;
 
 /* Holds the values of the different parameters. */
-uint8_t parameters[MAX_PARAMETERS] = { 2, 190, 255, 128, 5, 0, /*NUM_LEDS-1*/ 4 };
+uint8_t parameters[MAX_PARAMETERS] = { 0, 190, 255, 128, 10, 0, NUM_LEDS-1 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
