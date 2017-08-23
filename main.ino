@@ -1,4 +1,10 @@
+/* Use the FastLED library instead of the Adafruit NeoPixel library. */
 #include <FastLED.h>
+
+/* This optional setting causes Encoder to use more optimized code,
+ * It must be defined before Encoder.h is included. */
+#define ENCODER_OPTIMIZE_INTERRUPTS
+#include <Encoder.h>
 
 /* Digital output pins. */
 #define PIN_ROTARY_LEFT 2
@@ -8,6 +14,9 @@
 
 /* Number of LEDs in the strip. */
 #define NUM_LEDS 60
+
+/* Rotary encoder object */
+Encoder encoder(PIN_ROTARY_LEFT, PIN_ROTARY_RIGHT);
 
 /* This variable holds the LED color state. */
 CRGB leds[NUM_LEDS];
@@ -64,6 +73,8 @@ bool buttonChanged() {
 }
 
 void loop() {
+    int32_t e;
+
     if (buttonChanged()) {
         if (buttonPressed()) {
             activeVariable = (activeVariable + 1) % MAX_VARIABLES;
@@ -73,17 +84,17 @@ void loop() {
         }
     }
 
-    if (digitalRead(PIN_ROTARY_LEFT) == LOW) {
-        leds[10] = CHSV(0, 255, 127);
+    e = encoder.read();
+    if (e <= -4) {
+        leds[10] = CHSV(0, 255, 255);
+        e += 4;
+    } else if (e >= 4) {
+        leds[10] = CHSV(120, 255, 255);
+        e -= 4;
     } else {
         leds[10] = CRGB::Black;
     }
-
-    if (digitalRead(PIN_ROTARY_RIGHT) == LOW) {
-        leds[11] = CHSV(0, 255, 127);
-    } else {
-        leds[11] = CRGB::Black;
-    }
+    encoder.write(e);
 
     FastLED.show();
 }
