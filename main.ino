@@ -139,59 +139,83 @@ void modeTemperature() {
     FastLED.setBrightness(parameters[PARAMETER_VALUE]);
 }
 
-void fillSolid(uint8_t start, uint8_t end, CHSV color) {
-    while (start >= NUM_LEDS) {
-        start -= NUM_LEDS;
-        end -= NUM_LEDS;
-    }
+/* ledRange returns a array of bools indicating which LEDs should be drawn,
+ * according to the start and end parameters. This function differs from the
+ * FastLED library function in the sense that end may be smaller than start. */
+bool *ledRange(uint8_t start, uint8_t end) {
+    static bool lit[NUM_LEDS];
 
-    fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
+    memset(&lit, 0, sizeof lit);
 
+    start %= NUM_LEDS;
     end %= NUM_LEDS;
 
-    /* Contiguous block */
     if (end >= start) {
+        /* Contiguous block */
+
         for (uint8_t led = start; led <= end; led++) {
+            lit[led] = true;
+        }
+    } else {
+        /* Split into two parts. Draw start first, then end. */
+
+        for (uint8_t led = 0; led <= end; led++) {
+            lit[led] = true;
+        }
+
+        for (uint8_t led = start; led < NUM_LEDS; led++) {
+            lit[led] = true;
+        }
+    }
+
+    return lit;
+}
+
+/* Fill LEDs with a solid color according to the specified range. All other
+ * LEDs are blacked out. */
+void fillSolid(bool *range, CHSV color) {
+    fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
+
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        if (range[led]) {
             leds[led] = color;
         }
-        return;
-    }
-
-    /* Split into two parts. Draw start first, then end. */
-    for (uint8_t led = 0; led <= end; led++) {
-        leds[led] = color;
-    }
-
-    for (uint8_t led = start; led < NUM_LEDS; led++) {
-        leds[led] = color;
     }
 }
 
-/* animatedFill fills the portion of LEDs that should be lit up according to
- * POSITION and SIZE. If an animation was triggered, return true. Otherwise,
- * return false. */
-bool animatedFill(CHSV color) {
+/* animatedLEDs returns a boolean array of LEDs that should be lit up according
+* to POSITION and SIZE. Additionally, the movement animation is attempted. If an
+* animation occurred, the animated boolean is set to true. Otherwise, it is set
+* to false. If the animated parameter is NULL, it is ignored. */
+bool *animatedLEDs(bool *animated = NULL) {
     static uint8_t animation_start = 0;
     uint8_t start;
+    bool *range;
+    bool anim;
 
     start = (animation_start + parameters[PARAMETER_POSITION]) % NUM_LEDS;
+    range = ledRange(start, start + parameters[PARAMETER_SIZE]);
+    anim = stepAnimation();
 
-    fillSolid(start, start + parameters[PARAMETER_SIZE], color);
-
-    if (!stepAnimation()) {
-        return false;
+    if (anim) {
+        animation_start++;
+        animation_start %= NUM_LEDS;
     }
 
-    animation_start++;
-    animation_start %= NUM_LEDS;
+    if (animated) {
+        *animated = anim;
+    }
 
-    return true;
+    return range;
 }
 
 /* modeSolid draws a solid color across all LEDs, according to the parameters
  * HUE, SATURATION, VALUE. */
 void modeSolid() {
-    animatedFill(CHSV(
+    bool *range;
+
+    range = animatedLEDs();
+    fillSolid(range, CHSV(
         parameters[PARAMETER_HUE],
         parameters[PARAMETER_SATURATION],
         parameters[PARAMETER_VALUE]
@@ -203,8 +227,11 @@ void modeSolid() {
 void modeSolidRainbow() {
     static uint8_t hue = 0;
     bool animated;
+    bool *range;
 
-    animated = animatedFill(CHSV(
+    range = animatedLEDs(&animated);
+
+    fillSolid(range, CHSV(
         hue + parameters[PARAMETER_HUE],
         parameters[PARAMETER_SATURATION],
         parameters[PARAMETER_VALUE]
