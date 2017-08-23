@@ -20,18 +20,18 @@ de-pressed.
 
 The solid colors are of the rainbow. Thus, only seven parameters are supported:
 
-* *Red* changes mode
-* *Orange* changes hue
-* *Yellow* changes saturation
-* *Green* changes value
-* *Blue* changes speed
-* *Indigo* ?
-* *Violet* ?
+* *Red* changes mode.
+* *Orange* changes hue (position on the color wheel).
+* *Yellow* changes saturation (amount of color).
+* *Green* changes value (brightness).
+* *Blue* changes animation speed.
+* *Indigo* has no function.
+* *Violet* has no function.
 
 ### Mode
 
 * Solid color: displays a single color across all LEDs.
-* Solid Rainbow: cycle through the color wheel, showing a single color.
+* Solid rainbow: cycle through the color wheel, showing a single color.
 * Rainbow: color the LEDs with red to purple.
 * Temperature: white leds, tinted red or blue according to temperature.
 

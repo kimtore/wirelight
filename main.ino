@@ -22,11 +22,13 @@ Encoder encoder(PIN_ROTARY_ONE, PIN_ROTARY_TWO);
 CRGB leds[NUM_LEDS];
 
 /* All the different modes that are available. */
-#define MAX_MODES 3
+#define MAX_MODES 4
+void modeTemperature();
 void modeSolid();
 void modeSolidRainbow();
 void modeRainbow();
 void (*modes[MAX_MODES])() = {
+    &modeTemperature,
     &modeSolid,
     &modeSolidRainbow,
     &modeRainbow
@@ -46,7 +48,7 @@ void (*modes[MAX_MODES])() = {
 uint8_t activeParameter = PARAMETER_MODE;
 
 /* Holds the values of the different parameters. */
-uint8_t parameters[MAX_PARAMETERS] = { 0, 146, 255, 180, 20, 0, 0 };
+uint8_t parameters[MAX_PARAMETERS] = { 0, 190, 255, 128, 20, 0, 0 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
@@ -65,7 +67,7 @@ CRGB rainbowColors[MAX_PARAMETERS] = {
 
 /* Initial setup, called once on boot. */
 void setup() {
-    FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS);
+    FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
 }
 
@@ -129,6 +131,12 @@ bool stepAnimation() {
     }
 
     return rval;
+}
+
+/* modeTemperature draws a solid color across all LEDs, according to color temperature. */
+void modeTemperature() {
+    fill_solid(&leds[0], NUM_LEDS, HeatColor(parameters[PARAMETER_HUE]));
+    FastLED.setBrightness(parameters[PARAMETER_VALUE]);
 }
 
 /* modeSolid draws a solid color across all LEDs, according to the parameters
