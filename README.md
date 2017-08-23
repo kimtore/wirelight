@@ -25,8 +25,8 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 * *Yellow* changes saturation (amount of color).
 * *Green* changes value (brightness).
 * *Blue* changes animation speed.
-* *Indigo* has no function.
-* *Violet* has no function.
+* *Indigo* changes start position.
+* *Violet* changes lit segment size.
 
 ### Mode
 

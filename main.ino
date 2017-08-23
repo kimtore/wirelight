@@ -40,19 +40,19 @@ void (*modes[MAX_MODES])() = {
 #define PARAMETER_SATURATION 2
 #define PARAMETER_VALUE 3
 #define PARAMETER_SPEED 4
-//#define PARAMETER_XXX 5
-//#define PARAMETER_XXX 6
+#define PARAMETER_POSITION 5
+#define PARAMETER_SIZE 6
 #define MAX_PARAMETERS 7
 
 /* Holds the parameter that is currently changed using the rotary wheel. */
 uint8_t activeParameter = PARAMETER_MODE;
 
 /* Holds the values of the different parameters. */
-uint8_t parameters[MAX_PARAMETERS] = { 0, 190, 255, 128, 20, 0, 0 };
+uint8_t parameters[MAX_PARAMETERS] = { 1, 190, 255, 128, 5, 0, /*NUM_LEDS-1*/ 4 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
-uint8_t parameterMax[MAX_PARAMETERS] = { MAX_MODES, 0, 0, 0, 0, 0, 0 };
+uint8_t parameterMax[MAX_PARAMETERS] = { MAX_MODES, 0, 0, 0, 0, NUM_LEDS, NUM_LEDS };
 
 /* Rainbow colors, used to signify active parameter to the user. */
 CRGB rainbowColors[MAX_PARAMETERS] = {
@@ -139,14 +139,54 @@ void modeTemperature() {
     FastLED.setBrightness(parameters[PARAMETER_VALUE]);
 }
 
+void fillSolid(uint8_t start, uint8_t end, CHSV color) {
+    while (start >= NUM_LEDS) {
+        start -= NUM_LEDS;
+        end -= NUM_LEDS;
+    }
+
+    fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
+
+    end %= NUM_LEDS;
+
+    /* Contiguous block */
+    if (end >= start) {
+        for (uint8_t led = start; led < end; led++) {
+            leds[led] = color;
+        }
+        return;
+    }
+
+    /* Split into two parts. Draw start first, then end. */
+    for (uint8_t led = 0; led < end; led++) {
+        leds[led] = color;
+    }
+
+    for (uint8_t led = start; led < NUM_LEDS; led++) {
+        leds[led] = color;
+    }
+}
+
 /* modeSolid draws a solid color across all LEDs, according to the parameters
  * HUE, SATURATION, VALUE. */
 void modeSolid() {
-    fill_solid(&leds[0], NUM_LEDS, CHSV(
+    static uint8_t animation_start = 0;
+    uint8_t start;
+
+    start = (animation_start + parameters[PARAMETER_POSITION]) % NUM_LEDS;
+
+    fillSolid(start, start + parameters[PARAMETER_SIZE], CHSV(
         parameters[PARAMETER_HUE],
         parameters[PARAMETER_SATURATION],
         parameters[PARAMETER_VALUE]
     ));
+
+    if (!stepAnimation()) {
+        return;
+    }
+
+    animation_start++;
+    animation_start %= NUM_LEDS;
 }
 
 /* modeSolidRainbow draws a solid color across all LEDs, animating it according
