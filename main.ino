@@ -133,12 +133,6 @@ bool stepAnimation() {
     return rval;
 }
 
-/* modeTemperature draws a solid color across all LEDs, according to color temperature. */
-void modeTemperature() {
-    fill_solid(&leds[0], NUM_LEDS, HeatColor(parameters[PARAMETER_HUE]));
-    FastLED.setBrightness(parameters[PARAMETER_VALUE]);
-}
-
 /* ledRange returns a array of bools indicating which LEDs should be drawn,
  * according to the start and end parameters. This function differs from the
  * FastLED library function in the sense that end may be smaller than start. */
@@ -173,7 +167,7 @@ bool *ledRange(uint8_t start, uint8_t end) {
 
 /* Fill LEDs with a solid color according to the specified range. All other
  * LEDs are blacked out. */
-void fillSolid(bool *range, CHSV color) {
+void fillSolid(bool *range, CRGB color) {
     fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
 
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
@@ -207,6 +201,16 @@ bool *animatedLEDs(bool *animated = NULL) {
     }
 
     return range;
+}
+
+/* modeTemperature draws a solid color across all LEDs, according to color temperature. */
+void modeTemperature() {
+    bool *range;
+
+    range = animatedLEDs();
+    fillSolid(range, HeatColor(parameters[PARAMETER_HUE]));
+
+    FastLED.setBrightness(parameters[PARAMETER_VALUE]);
 }
 
 /* modeSolid draws a solid color across all LEDs, according to the parameters
@@ -247,19 +251,29 @@ void modeRainbow() {
     static uint8_t animation_hue = 0;
     uint8_t hue;
     uint8_t step;
+    uint8_t steps = 0;
+    bool animated;
+    bool *range;
 
-    step = 255 / NUM_LEDS;
+    range = animatedLEDs(&animated);
+
+    /* Increment the color wheel so that it matches the number of visible LEDs */
+    step = 255 / parameters[PARAMETER_SIZE];
+
+    /* Black out all LEDs */
+    fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
 
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = animation_hue + parameters[PARAMETER_HUE] + (led * step);
+        if (!range[led]) {
+            continue;
+        }
+        hue = animation_hue + parameters[PARAMETER_HUE] + (steps++ * step);
         leds[led] = CHSV(hue, parameters[PARAMETER_SATURATION], parameters[PARAMETER_VALUE]);
     }
 
-    if (!stepAnimation()) {
-        return;
+    if (animated) {
+        animation_hue++;
     }
-
-    animation_hue++;
 }
 
 /* Check if rotary wheel changed, and adjust active parameter */
