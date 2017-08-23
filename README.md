@@ -31,6 +31,7 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 ### Mode
 
 * Solid color: displays a single color across all LEDs.
+* Temperature: white leds, tinted red or blue according to temperature.
 * Rainbow: color the LEDs with red to purple.
 
 ### Hue
