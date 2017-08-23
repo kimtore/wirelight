@@ -28,26 +28,6 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 * *Indigo* ?
 * *Violet* ?
 
-Colors of the rainbow:
-
-* red hsl(0,100%,50%)
-* gold hsl(51,100%,50%)
-* chartreuse hsl(103,100%,50%)
-* spring green hsl(154,100%,50%)
-* dodger blue hsl(206,100%,50%)
-* saturated slate blue hsl(257,100%,50%)
-* deep pink - violet, arguably fuchsia hsl(309,100%,50%)
-
-Alternate colors:
-
-* red hsl(2,80%,50%)
-* orange-red hsl(24,100%,50%)
-* orange-yellow hsl(39,100%,50%)
-* yellow-tinged green hsl(70,100%,50%)
-* aquamarine hsl(158,100%,50%)
-* royal blue hsl(230,70%,50%)
-* medium purple hsl(252,100%,70%)
-
 ### Mode
 
 * Solid color: displays a single color across all LEDs.
