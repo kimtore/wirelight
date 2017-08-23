@@ -72,5 +72,18 @@ void loop() {
             fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
         }
     }
+
+    if (digitalRead(PIN_ROTARY_LEFT) == LOW) {
+        leds[10] = CHSV(0, 255, 127);
+    } else {
+        leds[10] = CRGB::Black;
+    }
+
+    if (digitalRead(PIN_ROTARY_RIGHT) == LOW) {
+        leds[11] = CHSV(0, 255, 127);
+    } else {
+        leds[11] = CRGB::Black;
+    }
+
     FastLED.show();
 }
