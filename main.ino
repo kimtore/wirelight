@@ -22,11 +22,13 @@ Encoder encoder(PIN_ROTARY_ONE, PIN_ROTARY_TWO);
 CRGB leds[NUM_LEDS];
 
 /* All the different modes that are available. */
-#define MAX_MODES 2
+#define MAX_MODES 3
 void modeSolid();
+void modeSolidRainbow();
 void modeRainbow();
 void (*modes[MAX_MODES])() = {
     &modeSolid,
+    &modeSolidRainbow,
     &modeRainbow
 };
 
@@ -44,7 +46,7 @@ void (*modes[MAX_MODES])() = {
 uint8_t activeParameter = PARAMETER_MODE;
 
 /* Holds the values of the different parameters. */
-uint8_t parameters[MAX_PARAMETERS] = { 0, 146, 255, 180, 128, 0, 0 };
+uint8_t parameters[MAX_PARAMETERS] = { 0, 146, 255, 180, 20, 0, 0 };
 
 /* Maximum values of the different parameters, plus one. Zero denotes that a
  * variable can stretch the full range of 0-255. */
@@ -108,6 +110,7 @@ bool stepAnimation() {
     uint32_t diff;
     uint32_t clock;
     uint32_t expectedDelay;
+    bool rval;
 
     /* Animations are disabled when speed is zero */
     if (parameters[PARAMETER_SPEED] == 0) {
@@ -117,11 +120,15 @@ bool stepAnimation() {
     clock = millis();
     diff = clock - lastClock;
 
-    /* Otherwise, delay 1/SPEED milliseconds */
-    lastClock = clock;
+    /* Otherwise, delay 1000/SPEED milliseconds. */
     expectedDelay = 1000 / parameters[PARAMETER_SPEED];
+    rval = (diff >= expectedDelay);
 
-    return diff >= expectedDelay;
+    if (rval) {
+        lastClock = clock;
+    }
+
+    return rval;
 }
 
 /* modeSolid draws a solid color across all LEDs, according to the parameters
@@ -134,6 +141,24 @@ void modeSolid() {
     ));
 }
 
+/* modeSolidRainbow draws a solid color across all LEDs, animating it according
+ * to the color wheel. */
+void modeSolidRainbow() {
+    static uint8_t hue = 0;
+
+    fill_solid(&leds[0], NUM_LEDS, CHSV(
+        hue + parameters[PARAMETER_HUE],
+        parameters[PARAMETER_SATURATION],
+        parameters[PARAMETER_VALUE]
+    ));
+
+    if (!stepAnimation()) {
+        return;
+    }
+
+    hue++;
+}
+
 /* modeRainbow draws an animated rainbow across all LEDs. */
 void modeRainbow() {
     static uint8_t animation_hue = 0;
@@ -143,7 +168,7 @@ void modeRainbow() {
     step = 255 / NUM_LEDS;
 
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = animation_hue - parameters[PARAMETER_HUE] - (led * step);
+        hue = animation_hue + parameters[PARAMETER_HUE] + (led * step);
         leds[led] = CHSV(hue, parameters[PARAMETER_SATURATION], parameters[PARAMETER_VALUE]);
     }
 
@@ -151,7 +176,28 @@ void modeRainbow() {
         return;
     }
 
-    animation_hue--;
+    animation_hue++;
+}
+
+/* Check if rotary wheel changed, and adjust active parameter */
+void adjustParameter() {
+    uint8_t changed;
+    int8_t delta;
+    uint8_t *mx = &parameterMax[activeParameter];
+
+    delta = rotary_delta();
+    changed = parameters[activeParameter] + delta;
+
+    /* Wrap around */
+    if (*mx > 0 && changed >= *mx) {
+        if (delta < 1) {
+            changed = *mx - 1;
+        } else {
+            changed = 0;
+        }
+    }
+
+    parameters[activeParameter] = changed;
 }
 
 /* loop is called continuously. */
@@ -169,10 +215,10 @@ void loop() {
         return;
     }
 
-    /* Increase or decrease parameter if rotary encoder moved. */
-    parameters[activeParameter] += rotary_delta();
-    parameters[activeParameter] %= parameterMax[activeParameter];
+    /* Adjust active parameter, if neccessary */
+    adjustParameter();
 
+    /* Increase or decrease parameter if rotary encoder moved. */
     /* Run the currently active mode. */
     modes[parameters[PARAMETER_MODE]]();
     FastLED.show();
