@@ -26,7 +26,7 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 * *Green* changes value (brightness).
 * *Blue* changes animation speed.
 * *Indigo* changes start position.
-* *Violet* changes lit segment size.
+* *Violet* changes lit LED count.
 
 ### Mode
 
@@ -37,20 +37,18 @@ The solid colors are of the rainbow. Thus, only seven parameters are supported:
 
 ### Hue
 
-Selects the color from the rainbow color wheel. This parameter has a value
-between 0-255.
+Selects the color from the rainbow color wheel.
 
 ### Saturation
 
-Sets the color saturation of all LEDs. This parameter has a value between
-0-255, where zero equals white or no color.
+Sets the color saturation of all LEDs. If saturation is set to zero, all LEDs
+turn white.
 
 ### Value
 
-Sets the brightness of all luminated LEDs. This parameter has a value between
-0-255, where zero is completely dark.
+Sets the brightness of all luminated LEDs.
 
-### Speed
+### Animation speed
 
 Controls the speed of the animation. The speed is increased by one each dial,
 with the formula being:
@@ -58,3 +56,15 @@ with the formula being:
     wait_time = 1 second / speed
 
 If speed is zero, animations are disabled.
+
+### Start position
+
+This setting moves lit LEDs around. It is only useful when the lit segment size
+parameter is decreased so that only some LEDs are lit, and animations disabled.
+
+Note that the start position will dynamically change when animations are
+enabled.
+
+### Lit LED count
+
+Controls how many LEDs are lit up at any given time.
