@@ -36,10 +36,11 @@ CRGB leds[NUM_LEDS];
 #define MAX_MODES 10
 void modeOff();
 void modeSolid();
+void modeRainbow();
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
-    &modeOff,
+    &modeRainbow,
     &modeOff,
     &modeOff,
     &modeOff,
@@ -121,6 +122,16 @@ void modeOff() {
 // Fill all LEDs with the same color. This mode does not have an additional parameter.
 void modeSolid() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.saturation, pots.val));
+}
+
+// Draw the rainbow. The additional parameter moves the rainbow back and forth.
+void modeRainbow() {
+    uint8_t hue;
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        hue = map(led, 0, NUM_LEDS, 0, 255);
+        hue += pots.var;
+        leds[led] = CHSV(hue, pots.saturation, pots.val);
+    }
 }
 
 // Read all potentiometers, and run one iteration of the active mode.
