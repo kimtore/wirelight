@@ -38,12 +38,13 @@ void modeOff();
 void modeSolid();
 void modeRainbow();
 void modeRainbowCycle();
+void modeCubic();
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
     &modeRainbow,
     &modeRainbowCycle,
-    &modeOff,
+    &modeCubic,
     &modeOff,
     &modeOff,
     &modeOff,
@@ -55,7 +56,7 @@ struct {
     uint8_t mode;
     uint8_t var;
     uint8_t hue;
-    uint8_t saturation;
+    uint8_t sat;
     uint8_t val;
 } pots;
 
@@ -109,32 +110,48 @@ uint8_t modeNumber(uint16_t analogValue) {
     }
 }
 
-// stepAnimation returns true if it is time for the next step in the animation,
-// according to the speed parameter.
-bool stepAnimation(uint8_t speed) {
+// animate returns true if the animation should be stepped.
+uint8_t animate() {
     static uint32_t lastClock = 0;
     uint32_t diff;
     uint32_t clock;
     uint32_t expectedDelay;
-    bool rval;
 
-    /* Animations are disabled when speed is zero */
-    if (speed == 0) {
-        return false;
+    // Animations are disabled when speed is zero.
+    if (pots.var == 0) {
+        return 0;
     }
 
     clock = millis();
     diff = clock - lastClock;
 
-    /* Otherwise, delay 1000/speed milliseconds. */
-    expectedDelay = map(speed, 1, 255, 1000, 40);
-    rval = (diff >= expectedDelay);
-
-    if (rval) {
+    expectedDelay = map(pots.var, 1, 255, 400, 5);
+    if (diff >= expectedDelay) {
         lastClock = clock;
+        return 1;
     }
 
-    return rval;
+    return 0;
+}
+
+// animation animates linearly, repeating the numbers 0-255.
+uint8_t animation() {
+    static uint8_t an = 0;
+    an += animate();
+    return an;
+}
+
+// animation animates linearly, repeating the numbers 0-255.
+uint8_t animationCubic() {
+    static uint8_t an = 0;
+    static int8_t multiplier = 1;
+    if (an == 255 && multiplier == 1) {
+        multiplier = -1;
+    } else if (an == 0 && multiplier == -1) {
+        multiplier = 1;
+    }
+    an = an + (multiplier * animate());
+    return an;
 }
 
 // Read a value from an analog pin as a byte value between 0-255.
@@ -150,7 +167,7 @@ void modeOff() {
 
 // Fill all LEDs with the same color. This mode does not have an additional parameter.
 void modeSolid() {
-    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.saturation, pots.val));
+    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, pots.val));
 }
 
 // Draw the rainbow. The additional parameter moves the rainbow back and forth.
@@ -159,22 +176,28 @@ void modeRainbow() {
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         hue = map(led, 0, NUM_LEDS, 0, 255);
         hue += pots.var;
-        leds[led] = CHSV(hue, pots.saturation, pots.val);
+        leds[led] = CHSV(hue, pots.sat, pots.val);
     }
 }
 
 // Draw the rainbow, and gradually move it according to the addition parameter,
 // which regulates the speed.
 void modeRainbowCycle() {
-    static uint8_t offset = 0;
     uint8_t hue;
-    if (stepAnimation(pots.var)) {
-        offset++;
-    }
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         hue = map(led, 0, NUM_LEDS, 0, 255);
-        hue += offset;
-        leds[led] = CHSV(hue, pots.saturation, pots.val);
+        hue += animation();
+        leds[led] = CHSV(hue, pots.sat, pots.val);
+    }
+}
+
+void modeCubic() {
+    uint8_t cubic;
+    uint8_t value;
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        cubic = animationCubic();
+        value = map(cubic, 0, 255, min(70, pots.val), pots.val);
+        leds[led] = CHSV(pots.hue, pots.sat, value);
     }
 }
 
@@ -185,11 +208,11 @@ void loop() {
     delay(100);
 #endif
 
-    pots.mode       = modeNumber(analogRead(PIN_POT_SWITCH));
-    pots.var        = adc8(PIN_POT_TOP);
-    pots.hue        = adc8(PIN_POT_LEFT);
-    pots.saturation = adc8(PIN_POT_CENTER);
-    pots.val        = adc8(PIN_POT_RIGHT);
+    pots.mode = modeNumber(analogRead(PIN_POT_SWITCH));
+    pots.var  = adc8(PIN_POT_TOP);
+    pots.hue  = adc8(PIN_POT_LEFT);
+    pots.sat  = adc8(PIN_POT_CENTER);
+    pots.val  = adc8(PIN_POT_RIGHT);
 
     modes[pots.mode]();
     FastLED.show();
