@@ -113,10 +113,12 @@ uint8_t adc8(uint8_t pin) {
     return map(analog, 1023, 0, 0, 255);
 }
 
+// Switch off all LEDs.
 void modeOff() {
     fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
 }
 
+// Fill all LEDs with the same color. This mode does not have an additional parameter.
 void modeSolid() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.saturation, pots.val));
 }
