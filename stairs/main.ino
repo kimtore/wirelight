@@ -36,6 +36,7 @@ CRGB leds[NUM_LEDS];
 #define MAX_MODES 10
 void modeOff();
 void modeSolid();
+void modeGradient();
 void modeRainbow();
 void modeRainbowCycle();
 void modeBreathe();
@@ -44,12 +45,12 @@ void modeEase();
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
+    &modeGradient,
     &modeRainbow,
     &modeRainbowCycle,
-    &modeBreathe,
+    &modeEase,
     &modeSine,
-    &modeEase,
-    &modeEase,
+    &modeBreathe,
     &modeOff,
     &modeOff
 };
@@ -89,31 +90,6 @@ void debugPots() {
     Serial.println(buf);
 }
 #endif
-
-// Convert analog voltage readings to a mode number.
-uint8_t modeNumber(uint16_t analogValue) {
-    if (analogValue < 100) {
-        return 0;
-    } else if (analogValue < 150) {
-        return 1;
-    } else if (analogValue < 200) {
-        return 2;
-    } else if (analogValue < 250) {
-        return 3;
-    } else if (analogValue < 550) {
-        return 4;
-    } else if (analogValue < 650) {
-        return 5;
-    } else if (analogValue < 750) {
-        return 6;
-    } else if (analogValue < 850) {
-        return 7;
-    } else if (analogValue < 950) {
-        return 8;
-    } else {
-        return 9;
-    }
-}
 
 // animate returns true if the animation should be stepped.
 uint8_t animate() {
@@ -166,6 +142,26 @@ uint8_t adc8(uint8_t pin) {
     return map(analog, 1023, 0, 0, 255);
 }
 
+// Return the switch position from 0-9.
+uint8_t switchPosition(uint8_t pin) {
+    uint16_t analog = analogRead(pin);
+    // readings are 91, 128, 176, 235, 509, 605, 768, 695, 930, 958
+    if (analog < 127)   return 0;
+    if (analog < 175)   return 1;
+    if (analog < 234)   return 2;
+    if (analog < 508)   return 3;
+    if (analog < 604)   return 4;
+    if (analog < 694)   return 5;
+    if (analog < 767)   return 7;
+    if (analog < 929)   return 6;
+    if (analog < 957)   return 8;
+    return 9;
+}
+
+uint8_t ledAngle(uint8_t led) {
+    return map(led, 0, NUM_LEDS-1, 0, 255);
+}
+
 // Switch off all LEDs.
 void modeOff() {
     fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
@@ -176,11 +172,19 @@ void modeSolid() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, pots.val));
 }
 
+// Draw a linear gradient between two colors. The additional parameter defines
+// the destination hue. The same saturation and value applies to both colors.
+void modeGradient() {
+    fill_gradient(&leds[0],
+                  0, CHSV(pots.hue, pots.sat, pots.val),
+                  NUM_LEDS-1, CHSV(pots.var, pots.sat, pots.val));
+}
+
 // Draw the rainbow. The additional parameter moves the rainbow back and forth.
 void modeRainbow() {
     uint8_t hue;
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = map(led, 0, NUM_LEDS, 0, 255);
+        hue = ledAngle(led);
         hue += pots.var;
         leds[led] = CHSV(hue, pots.sat, pots.val);
     }
@@ -191,7 +195,7 @@ void modeRainbow() {
 void modeRainbowCycle() {
     uint8_t hue;
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = map(led, 0, NUM_LEDS, 0, 255);
+        hue = ledAngle(led);
         hue += animation();
         leds[led] = CHSV(hue, pots.sat, pots.val);
     }
@@ -214,7 +218,7 @@ void modeSine() {
     uint8_t value;
     uint8_t an = animation();
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        angle = map(led, 0, NUM_LEDS-1, 0, 255);
+        angle = ledAngle(led);
         value = sin8(angle + an);
         value = map(value, 0, 255, 0, pots.val);
         leds[led] = CHSV(pots.hue, pots.sat, value);
@@ -241,7 +245,7 @@ void loop() {
     delay(100);
 #endif
 
-    pots.mode = modeNumber(analogRead(PIN_POT_SWITCH));
+    pots.mode = switchPosition(PIN_POT_SWITCH);
     pots.var  = adc8(PIN_POT_TOP);
     pots.hue  = adc8(PIN_POT_LEFT);
     pots.sat  = adc8(PIN_POT_CENTER);
