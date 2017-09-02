@@ -1,217 +1,139 @@
-#include <Adafruit_NeoPixel.h>
+// Use the FastLED library.
+#include <FastLED.h>
 
-#define OUTPUT_PIN 5
+// Serial DEBUG mode on/off
+#undef DEBUG_POTS
+
+// Analog input pins.
+//
+// .-------.
+// |  O O  |
+// | O O O |
+// '-------'
+//
+// The device has five potentiometer inputs. The top left is a switch with 10
+// different values, while the other four have a variable input between 0-1023.
+//
+// The switch defines how the LEDs behave. The top button adjusts the parameter
+// in the current mode. The bottom three potentiometers adjusts hue, saturation,
+// and value for all the LEDs.
+#define PIN_POT_TOP 1
+#define PIN_POT_LEFT 2
+#define PIN_POT_CENTER 3
+#define PIN_POT_RIGHT 4
+#define PIN_POT_SWITCH 5
+
+// Digital IO pins.
+#define PIN_LED 5
+
+// Number of LEDs in the strip.
+#define NUM_LEDS 30
+
+// This variable holds the LED color state.
+CRGB leds[NUM_LEDS];
+
+/* All the different modes that are available. */
 #define MAX_MODES 10
-#define PULSE_INTENSITY_MIN 50
-
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(30, OUTPUT_PIN, NEO_GRB + NEO_KHZ800);
-
-void mode_off();
-void mode_solid_color();
-void mode_pulsing_solid_color();
-void mode_rainbow();
-void mode_rainbow_cycle();
-
+void modeOff();
+void modeSolid();
 void (*modes[MAX_MODES])() = {
-  mode_off,
-  mode_solid_color,
-  mode_pulsing_solid_color,
-  mode_rainbow,
-  mode_rainbow_cycle,
-  mode_off,
-  mode_off,
-  mode_off,
-  mode_off,
-  mode_off
+    &modeOff,
+    &modeSolid,
+    &modeOff,
+    &modeOff,
+    &modeOff,
+    &modeOff,
+    &modeOff,
+    &modeOff,
+    &modeOff,
+    &modeOff
 };
 
+struct {
+    uint8_t mode;
+    uint8_t var;
+    uint8_t hue;
+    uint8_t saturation;
+    uint8_t val;
+} pots;
+
+/* Initial setup, called once on boot. */
 void setup() {
-  Serial.begin(9600);
-  pinMode(OUTPUT_PIN, OUTPUT);
-  analogReference(DEFAULT);
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+    FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+#ifdef DEBUG_POTS
+    Serial.begin(115200);
+#endif
 }
 
-void debug_all() {
-  byte i;
-  uint16_t knobs[5];
-  char buf[64];
-  for (i=0; i<5; i++) {
-    knobs[i] = analogRead(i+1);
-    sprintf(buf, "Knob %d = %d\n", i, knobs[i]);
-    Serial.write(buf);
-  }
-  delay(1000);
-}
+#ifdef DEBUG_POTS
+void debugPots() {
+    uint8_t i;
+    uint16_t analog;
+    char buf[64];
+    char *ptr = &buf[0];
 
-byte read_mode() {
-  uint16_t value = analogRead(5);
-  if (value < 100) {
-    return 0;
-  } else if (value < 150) {
-    return 1;
-  } else if (value < 200) {
-    return 2;
-  } else if (value < 250) {
-    return 3;
-  } else if (value < 550) {
-    return 4;
-  } else if (value < 650) {
-    return 5;
-  } else if (value < 750) {
-    return 6;
-  } else if (value < 850) {
-    return 7;
-  } else if (value < 950) {
-    return 8;
-  } else {
-    return 9;
-  }
-}
-
-byte adc_to_8bit(uint16_t adc) {
-  adc = 1023 - adc;
-  adc <<= 6;
-  adc >>= 8;
-  return adc;
-}
-
-byte read_byte(byte input) {
-  return adc_to_8bit(analogRead(input));
-}
-
-byte read_delay(byte input, byte modifier) {
-  return (255 - read_byte(input)) / modifier;
-}
-
-void read_rgb(byte * rgb) {
-  byte i;
-  for (i = 0; i < 3; i++) {
-    rgb[i] = read_byte(i+2);
-  }
-}
-
-void intensify_rgb(byte * rgb, byte intensity) {
-  byte max_;
-  double value;
-  byte i;
-  max_ = max(rgb[0], max(rgb[1], rgb[2]));
-  if (max_ == 0) {
-    for (i = 0; i < 3; i++) {
-      rgb[i]++;
+    for (i=0; i<6; i++) {
+        analog = analogRead(i);
+        ptr += sprintf(ptr, "%4d, ", analog);
     }
-    max_ = 1;
-  }
-  for (i = 0; i < 3; i++) {
-    value = rgb[i];
-    value = (value / max_) * intensity;
-    rgb[i] = value;
-  }
+
+    sprintf(ptr, "\0");
+    Serial.println(buf);
 }
+#endif
 
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if(WheelPos < 170) {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
-
-void mode_off() {
-  uint16_t i;
-  for (i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, 0);
-  }
-}
-
-void mode_solid_color() {
-  byte rgb[3];
-  byte i;
-  
-  read_rgb(rgb);
-  intensify_rgb(rgb, read_byte(1));
-  
-  for(i = 0; i < strip.numPixels(); i++) {
-    uint32_t c = strip.Color(rgb[0], rgb[1], rgb[2]);
-    strip.setPixelColor(i, c);
-  }
-}
-
-void mode_pulsing_solid_color() {
-  byte rgb[3];
-  byte i;
-  static int8_t delta = 1;
-  static byte intensity = PULSE_INTENSITY_MIN;
-
-  delay(read_delay(1, 5));
-
-  intensity += delta;
-  if (intensity < PULSE_INTENSITY_MIN) {
-    delta *= -1;
-    intensity += delta;
-  }
-
-  read_rgb(rgb);
-  intensify_rgb(rgb, intensity);
-  
-  for(i = 0; i < strip.numPixels(); i++) {
-    uint32_t c = strip.Color(rgb[0], rgb[1], rgb[2]);
-    strip.setPixelColor(i, c);
-  }
-}
-
-void mode_rainbow() {
-  byte i;
-  static byte wheel_position = 0;
-
-  delay(read_delay(1, 3));
-  
-  for(i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, Wheel((i + wheel_position) & 255));
-  }
-
-  ++wheel_position;
-}
-
-void mode_rainbow_cycle() {
-  byte i;
-  static byte wheel_position = 0;
-
-  delay(read_delay(1, 3));
-  
-  for(i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + wheel_position) & 255));
-  }
-
-  ++wheel_position;
-}
-
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+// Convert analog voltage readings to a mode number.
+uint8_t modeNumber(uint16_t analogValue) {
+    if (analogValue < 100) {
+        return 0;
+    } else if (analogValue < 150) {
+        return 1;
+    } else if (analogValue < 200) {
+        return 2;
+    } else if (analogValue < 250) {
+        return 3;
+    } else if (analogValue < 550) {
+        return 4;
+    } else if (analogValue < 650) {
+        return 5;
+    } else if (analogValue < 750) {
+        return 6;
+    } else if (analogValue < 850) {
+        return 7;
+    } else if (analogValue < 950) {
+        return 8;
+    } else {
+        return 9;
     }
-    strip.show();
-    delay(wait);
-  }
 }
 
+// Read a value from an analog pin as a byte value between 0-255.
+uint8_t adc8(uint8_t pin) {
+    uint16_t analog = analogRead(pin);
+    return map(analog, 1023, 0, 0, 255);
+}
+
+void modeOff() {
+    fill_solid(&leds[0], NUM_LEDS, CRGB::Black);
+}
+
+void modeSolid() {
+    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.saturation, pots.val));
+}
+
+// Read all potentiometers, and run one iteration of the active mode.
 void loop() {
-  byte mode;
-  //debug_all();
-  mode = read_mode();
-  modes[mode]();
-  strip.show();
-}
+#ifdef DEBUG_POTS
+    debugPots();
+    delay(100);
+#endif
 
+    pots.mode       = modeNumber(analogRead(PIN_POT_SWITCH));
+    pots.var        = adc8(PIN_POT_TOP);
+    pots.hue        = adc8(PIN_POT_LEFT);
+    pots.saturation = adc8(PIN_POT_CENTER);
+    pots.val        = adc8(PIN_POT_RIGHT);
+
+    modes[pots.mode]();
+    FastLED.show();
+}
