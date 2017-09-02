@@ -32,16 +32,17 @@
 // This variable holds the LED color state.
 CRGB leds[NUM_LEDS];
 
-/* All the different modes that are available. */
+// All the different modes available.
 #define MAX_MODES 10
 void modeOff();
 void modeSolid();
 void modeRainbow();
+void modeRainbowCycle();
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
     &modeRainbow,
-    &modeOff,
+    &modeRainbowCycle,
     &modeOff,
     &modeOff,
     &modeOff,
@@ -58,7 +59,7 @@ struct {
     uint8_t val;
 } pots;
 
-/* Initial setup, called once on boot. */
+// Initial setup, called once on boot.
 void setup() {
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
 #ifdef DEBUG_POTS
@@ -108,6 +109,34 @@ uint8_t modeNumber(uint16_t analogValue) {
     }
 }
 
+// stepAnimation returns true if it is time for the next step in the animation,
+// according to the speed parameter.
+bool stepAnimation(uint8_t speed) {
+    static uint32_t lastClock = 0;
+    uint32_t diff;
+    uint32_t clock;
+    uint32_t expectedDelay;
+    bool rval;
+
+    /* Animations are disabled when speed is zero */
+    if (speed == 0) {
+        return false;
+    }
+
+    clock = millis();
+    diff = clock - lastClock;
+
+    /* Otherwise, delay 1000/speed milliseconds. */
+    expectedDelay = map(speed, 1, 255, 1000, 40);
+    rval = (diff >= expectedDelay);
+
+    if (rval) {
+        lastClock = clock;
+    }
+
+    return rval;
+}
+
 // Read a value from an analog pin as a byte value between 0-255.
 uint8_t adc8(uint8_t pin) {
     uint16_t analog = analogRead(pin);
@@ -130,6 +159,21 @@ void modeRainbow() {
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         hue = map(led, 0, NUM_LEDS, 0, 255);
         hue += pots.var;
+        leds[led] = CHSV(hue, pots.saturation, pots.val);
+    }
+}
+
+// Draw the rainbow, and gradually move it according to the addition parameter,
+// which regulates the speed.
+void modeRainbowCycle() {
+    static uint8_t offset = 0;
+    uint8_t hue;
+    if (stepAnimation(pots.var)) {
+        offset++;
+    }
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        hue = map(led, 0, NUM_LEDS, 0, 255);
+        hue += offset;
         leds[led] = CHSV(hue, pots.saturation, pots.val);
     }
 }
