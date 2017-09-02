@@ -6,6 +6,12 @@
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(30, OUTPUT_PIN, NEO_GRB + NEO_KHZ800);
 
+void mode_off();
+void mode_solid_color();
+void mode_pulsing_solid_color();
+void mode_rainbow();
+void mode_rainbow_cycle();
+
 void (*modes[MAX_MODES])() = {
   mode_off,
   mode_solid_color,
@@ -37,14 +43,6 @@ void debug_all() {
     Serial.write(buf);
   }
   delay(1000);
-}
-
-void loop() {
-  byte mode;
-  //debug_all();
-  mode = read_mode();
-  modes[mode]();
-  strip.show();
 }
 
 byte read_mode() {
@@ -112,6 +110,21 @@ void intensify_rgb(byte * rgb, byte intensity) {
   }
 }
 
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
 void mode_off() {
   uint16_t i;
   for (i = 0; i < strip.numPixels(); i++) {
@@ -122,7 +135,6 @@ void mode_off() {
 void mode_solid_color() {
   byte rgb[3];
   byte i;
-  uint32_t color;
   
   read_rgb(rgb);
   intensify_rgb(rgb, read_byte(1));
@@ -195,17 +207,11 @@ void rainbowCycle(uint8_t wait) {
   }
 }
 
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if(WheelPos < 170) {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+void loop() {
+  byte mode;
+  //debug_all();
+  mode = read_mode();
+  modes[mode]();
+  strip.show();
 }
+
