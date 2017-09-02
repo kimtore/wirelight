@@ -38,16 +38,18 @@ void modeOff();
 void modeSolid();
 void modeRainbow();
 void modeRainbowCycle();
-void modeCubic();
+void modeBreathe();
+void modeSine();
+void modeEase();
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
     &modeRainbow,
     &modeRainbowCycle,
-    &modeCubic,
-    &modeOff,
-    &modeOff,
-    &modeOff,
+    &modeBreathe,
+    &modeSine,
+    &modeEase,
+    &modeEase,
     &modeOff,
     &modeOff
 };
@@ -125,7 +127,7 @@ uint8_t animate() {
     clock = millis();
     diff = clock - lastClock;
 
-    expectedDelay = map(pots.var, 1, 255, 400, 5);
+    expectedDelay = map(pots.var, 1, 255, 250, 1);
     if (diff >= expectedDelay) {
         lastClock = clock;
         return 1;
@@ -134,24 +136,25 @@ uint8_t animate() {
     return 0;
 }
 
-// animation animates linearly, repeating the numbers 0-255.
+// animation animates from 0-255.
 uint8_t animation() {
     static uint8_t an = 0;
     an += animate();
     return an;
 }
 
-// animation animates linearly, repeating the numbers 0-255.
-uint8_t animationCubic() {
+// animationSin animates a sine wave.
+uint8_t animationSin() {
     static uint8_t an = 0;
-    static int8_t multiplier = 1;
-    if (an == 255 && multiplier == 1) {
-        multiplier = -1;
-    } else if (an == 0 && multiplier == -1) {
-        multiplier = 1;
-    }
-    an = an + (multiplier * animate());
-    return an;
+    an += animate();
+    return sin8(an);
+}
+
+// animationQuad animates quadratic in/out easing applied to a triangle wave.
+uint8_t animationQuad() {
+    static uint8_t an = 0;
+    an += animate();
+    return quadwave8(an);
 }
 
 // Read a value from an analog pin as a byte value between 0-255.
@@ -191,12 +194,39 @@ void modeRainbowCycle() {
     }
 }
 
-void modeCubic() {
-    uint8_t cubic;
+// Fill all LEDs with a single color. Animate the intensity as a sine wave.
+void modeBreathe() {
+    uint8_t sine;
     uint8_t value;
+    sine = animationSin();
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        cubic = animationCubic();
-        value = map(cubic, 0, 255, min(70, pots.val), pots.val);
+        value = map(sine, 0, 255, min(70, pots.val), pots.val);
+        leds[led] = CHSV(pots.hue, pots.sat, value);
+    }
+}
+
+// Animate each LED's intensity according to a sine wave.
+void modeSine() {
+    uint8_t angle;
+    uint8_t value;
+    uint8_t an = animation();
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        angle = map(led, 0, NUM_LEDS-1, 0, 255);
+        value = sin8(angle + an);
+        value = map(value, 0, 255, 0, pots.val);
+        leds[led] = CHSV(pots.hue, pots.sat, value);
+    }
+}
+
+// Animate each LED's intensity according to a cubic ease in-out function.
+void modeEase() {
+    uint8_t angle;
+    uint8_t value;
+    uint8_t an = animation();
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        angle = map(led, 0, NUM_LEDS-1, 0, 255);
+        value = ease8InOutCubic(sin8(angle + an));
+        value = map(value, 0, 255, 0, pots.val);
         leds[led] = CHSV(pots.hue, pots.sat, value);
     }
 }
