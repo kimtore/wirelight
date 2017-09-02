@@ -74,15 +74,18 @@ void setup() {
 void debugPots() {
     uint8_t i;
     uint16_t analog;
-    char buf[64];
+    char buf[128];
     char *ptr = &buf[0];
 
-    for (i=0; i<6; i++) {
+    ptr += sprintf(ptr, "adc(");
+    for (i=1; i<6; i++) {
         analog = analogRead(i);
-        ptr += sprintf(ptr, "%4d, ", analog);
+        ptr += sprintf(ptr, "%d: %4d, ", i, analog);
     }
+    ptr += sprintf(ptr, ") ");
+    ptr += sprintf(ptr, "pots(mode:%d, var:%3d, hue:%3d, sat:%3d, val:%3d)", pots.mode, pots.var, pots.hue, pots.sat, pots.val);
 
-    sprintf(ptr, "\0");
+    *ptr = '\0';
     Serial.println(buf);
 }
 #endif
