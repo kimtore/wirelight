@@ -39,7 +39,6 @@ void modeEase();
 void modeGradient();
 void modeOff();
 void modeRainbow();
-void modeRainbowCycle();
 void modeRainbowTrain();
 void modeSine();
 void modeSolid();
@@ -51,10 +50,10 @@ void (*modes[MAX_MODES])() = {
     &modeGradient,
     &modeEase,
     &modeRainbow,
-    &modeRainbowCycle,
     &modeRainbowTrain,
-    &modeSine,
     &modeBreathe,
+    &modeSine,
+    &modeOff,
     &modeOff
 };
 
@@ -183,23 +182,12 @@ void modeGradient() {
                   NUM_LEDS-1, CHSV(pots.var, pots.sat, pots.val));
 }
 
-// Draw the rainbow. The additional parameter moves the rainbow back and forth.
+// Animate the rainbow. The hue parameter moves the rainbow back and forth,
+// while the additional parameter regulates the animation speed.
 void modeRainbow() {
     uint8_t hue;
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = ledAngle(led);
-        hue += pots.var;
-        leds[led] = CHSV(hue, pots.sat, pots.val);
-    }
-}
-
-// Draw the rainbow, and gradually move it according to the addition parameter,
-// which regulates the speed.
-void modeRainbowCycle() {
-    uint8_t hue;
-    for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = ledAngle(led);
-        hue += animation();
+        hue = ledAngle(led) + animation() + pots.hue;
         leds[led] = CHSV(hue, pots.sat, pots.val);
     }
 }
