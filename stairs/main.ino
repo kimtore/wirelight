@@ -37,6 +37,7 @@ CRGB leds[NUM_LEDS];
 // All the different modes available.
 #define MAX_MODES 10
 void modeBreathe();
+void modeBreatheGradient();
 void modeEase();
 void modeGradient();
 void modeOff();
@@ -54,8 +55,8 @@ void (*modes[MAX_MODES])() = {
     &modeRainbow,
     &modeRainbowTrain,
     &modeBreathe,
+    &modeBreatheGradient,
     &modeSine,
-    &modeOff,
     &modeOff
 };
 
@@ -96,7 +97,7 @@ void debugPots() {
 #endif
 
 // animate returns true if the animation should be stepped.
-uint8_t animate() {
+uint8_t animate(uint8_t speed) {
     static uint32_t lastClock = 0;
     uint32_t diff;
     uint32_t clock;
@@ -110,7 +111,7 @@ uint8_t animate() {
     clock = millis();
     diff = clock - lastClock;
 
-    expectedDelay = map(pots.var, 1, 255, 250, 1);
+    expectedDelay = map(speed, 1, 255, 250, 1);
     if (diff >= expectedDelay) {
         lastClock = clock;
         return 1;
@@ -120,9 +121,9 @@ uint8_t animate() {
 }
 
 // animation animates from 0-255.
-uint8_t animation() {
+uint8_t animation(uint8_t speed) {
     static uint8_t an = 0;
-    an += animate();
+    an += animate(speed);
     return an;
 }
 
@@ -142,9 +143,9 @@ uint8_t switchPosition(uint8_t pin) {
     if (analog < 508)   return 3;
     if (analog < 604)   return 4;
     if (analog < 694)   return 5;
-    if (analog < 765)   return 7;
+    if (analog < 764)   return 7;
     if (analog < 929)   return 6;
-    if (analog < 957)   return 8;
+    if (analog < 955)   return 8;
     return 9;
 }
 
@@ -177,7 +178,7 @@ void modeGradient() {
 void modeRainbow() {
     uint8_t hue;
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = ledAngle(led) + animation() + pots.hue;
+        hue = ledAngle(led) + animation(pots.var) + pots.hue;
         leds[led] = CHSV(hue, pots.sat, pots.val);
     }
 }
@@ -188,12 +189,12 @@ void modeBreathe() {
     uint8_t sine;
     uint8_t value;
 
-    sine = cubicwave8(animation());
+    sine = cubicwave8(animation(pots.var));
     start = pots.val - 100;
     if (start > pots.val) {
         start = 0;
     }
-    value = map(sine, 0, 255, start, pots.val);
+    value = map8(sine, start, pots.val);
 
 #ifdef DEBUG_ANIMATION
     char buf[128];
@@ -205,11 +206,29 @@ void modeBreathe() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, value));
 }
 
+// Fill all LEDs with a single color, animating between two hues in a cubic
+// ease in-out wave resembling a sine wave. The speed is calculated
+// automatically based on distance on the color wheel.
+void modeBreatheGradient() {
+    uint8_t angle;
+    uint8_t hue;
+    uint8_t distance;
+    uint8_t speed;
+
+    distance = pots.var - pots.hue;
+    speed = 255 - map8(distance, 15, 130);
+
+    angle = cubicwave8(animation(speed));
+    hue = map8(angle, pots.hue, pots.var);
+
+    fill_solid(&leds[0], NUM_LEDS, CHSV(hue, pots.sat, pots.val));
+}
+
 // Animate each LED's intensity according to a sine wave.
 void modeSine() {
     uint8_t angle;
     uint8_t value;
-    uint8_t an = animation();
+    uint8_t an = animation(pots.var);
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = ledAngle(led);
         value = sin8(angle + an);
@@ -222,7 +241,7 @@ void modeSine() {
 void modeEase() {
     uint8_t angle;
     uint8_t value;
-    uint8_t an = animation();
+    uint8_t an = animation(pots.var);
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = map(led, 0, NUM_LEDS-1, 0, 255);
         value = ease8InOutCubic(sin8(angle + an));
@@ -237,7 +256,7 @@ void modeRainbowTrain() {
     uint8_t hue = 0;
     uint8_t angle;
     uint8_t value;
-    uint8_t an = animation();
+    uint8_t an = animation(pots.var);
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = map(led, 0, NUM_LEDS-1, 0, 255);
         value = ease8InOutCubic(sin8(angle + an));
