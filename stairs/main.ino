@@ -280,8 +280,8 @@ void modeRainbowTrain() {
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = map(led, 0, NUM_LEDS-1, 0, 255);
         value = ease8InOutCubic(sin8(angle + an));
-        hue = map(value, 0, 255, 0, pots.hue);
-        value = map(value, 0, 255, 0, pots.val);
+        hue = map8(value, 0, pots.hue);
+        value = map8(value, 0, pots.val);
         leds[led] = CHSV(hue, pots.sat, value);
     }
 }
