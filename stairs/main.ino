@@ -137,15 +137,15 @@ uint8_t adc8(uint8_t pin) {
 uint8_t switchPosition(uint8_t pin) {
     uint16_t analog = analogRead(pin);
     // readings are 91, 128, 176, 235, 509, 605, 767, 695, 930, 958
-    if (analog < 127)   return 0;
-    if (analog < 175)   return 1;
-    if (analog < 234)   return 2;
-    if (analog < 508)   return 3;
-    if (analog < 604)   return 4;
-    if (analog < 694)   return 5;
-    if (analog < 764)   return 7;
-    if (analog < 929)   return 6;
-    if (analog < 955)   return 8;
+    if (analog < 120)   return 0;
+    if (analog < 170)   return 1;
+    if (analog < 230)   return 2;
+    if (analog < 500)   return 3;
+    if (analog < 600)   return 4;
+    if (analog < 690)   return 5;
+    if (analog < 760)   return 7;
+    if (analog < 920)   return 6;
+    if (analog < 950)   return 8;
     return 9;
 }
 
