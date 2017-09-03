@@ -34,24 +34,27 @@ CRGB leds[NUM_LEDS];
 
 // All the different modes available.
 #define MAX_MODES 10
-void modeOff();
-void modeSolid();
+void modeBreathe();
+void modeEase();
 void modeGradient();
+void modeOff();
 void modeRainbow();
 void modeRainbowCycle();
-void modeBreathe();
+void modeRainbowTrain();
 void modeSine();
-void modeEase();
+void modeSolid();
+
+// Set the order of modes in the Modeselektor.
 void (*modes[MAX_MODES])() = {
     &modeOff,
     &modeSolid,
     &modeGradient,
+    &modeEase,
     &modeRainbow,
     &modeRainbowCycle,
-    &modeEase,
+    &modeRainbowTrain,
     &modeSine,
     &modeBreathe,
-    &modeOff,
     &modeOff
 };
 
@@ -235,6 +238,22 @@ void modeEase() {
         value = ease8InOutCubic(sin8(angle + an));
         value = map(value, 0, 255, 0, pots.val);
         leds[led] = CHSV(pots.hue, pots.sat, value);
+    }
+}
+
+// Animate a rainbow easing in and out. The hue parameter decides how far the
+// rainbow will stretch on the color wheel, while the variable determines the speed.
+void modeRainbowTrain() {
+    uint8_t hue = 0;
+    uint8_t angle;
+    uint8_t value;
+    uint8_t an = animation();
+    for (uint8_t led = 0; led < NUM_LEDS; led++) {
+        angle = map(led, 0, NUM_LEDS-1, 0, 255);
+        value = ease8InOutCubic(sin8(angle + an));
+        hue = map(value, 0, 255, 0, pots.hue);
+        value = map(value, 0, 255, 0, pots.val);
+        leds[led] = CHSV(hue, pots.sat, value);
     }
 }
 
