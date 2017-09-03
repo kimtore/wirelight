@@ -2,6 +2,8 @@
 #include <FastLED.h>
 
 // Serial DEBUG mode on/off
+#undef DEBUG_SERIAL
+#undef DEBUG_ANIMATION
 #undef DEBUG_POTS
 
 // Analog input pins.
@@ -68,7 +70,7 @@ struct {
 // Initial setup, called once on boot.
 void setup() {
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
-#ifdef DEBUG_POTS
+#ifdef DEBUG_SERIAL
     Serial.begin(115200);
 #endif
 }
@@ -124,20 +126,6 @@ uint8_t animation() {
     return an;
 }
 
-// animationSin animates a sine wave.
-uint8_t animationSin() {
-    static uint8_t an = 0;
-    an += animate();
-    return sin8(an);
-}
-
-// animationQuad animates quadratic in/out easing applied to a triangle wave.
-uint8_t animationQuad() {
-    static uint8_t an = 0;
-    an += animate();
-    return quadwave8(an);
-}
-
 // Read a value from an analog pin as a byte value between 0-255.
 uint8_t adc8(uint8_t pin) {
     uint16_t analog = analogRead(pin);
@@ -147,14 +135,14 @@ uint8_t adc8(uint8_t pin) {
 // Return the switch position from 0-9.
 uint8_t switchPosition(uint8_t pin) {
     uint16_t analog = analogRead(pin);
-    // readings are 91, 128, 176, 235, 509, 605, 768, 695, 930, 958
+    // readings are 91, 128, 176, 235, 509, 605, 767, 695, 930, 958
     if (analog < 127)   return 0;
     if (analog < 175)   return 1;
     if (analog < 234)   return 2;
     if (analog < 508)   return 3;
     if (analog < 604)   return 4;
     if (analog < 694)   return 5;
-    if (analog < 767)   return 7;
+    if (analog < 765)   return 7;
     if (analog < 929)   return 6;
     if (analog < 957)   return 8;
     return 9;
@@ -196,13 +184,25 @@ void modeRainbow() {
 
 // Fill all LEDs with a single color. Animate the intensity as a sine wave.
 void modeBreathe() {
+    uint8_t start;
     uint8_t sine;
     uint8_t value;
-    sine = animationSin();
-    for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        value = map(sine, 0, 255, min(70, pots.val), pots.val);
-        leds[led] = CHSV(pots.hue, pots.sat, value);
+
+    sine = sin8(animation());
+    start = pots.val - 100;
+    if (start > pots.val) {
+        start = 0;
     }
+    value = map(sine, 0, 255, start, pots.val);
+
+#ifdef DEBUG_ANIMATION
+    char buf[128];
+    sprintf(buf, "sine:%4d  start:%4d  pot:%4d  value:%4d", sine, start, pots.val, value);
+    Serial.println(buf);
+    delay(20);
+#endif
+
+    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, value));
 }
 
 // Animate each LED's intensity according to a sine wave.
