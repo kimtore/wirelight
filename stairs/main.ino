@@ -188,7 +188,7 @@ void modeBreathe() {
     uint8_t sine;
     uint8_t value;
 
-    sine = sin8(animation());
+    sine = cubicwave8(animation());
     start = pots.val - 100;
     if (start > pots.val) {
         start = 0;
