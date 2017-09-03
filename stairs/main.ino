@@ -40,24 +40,25 @@ void modeBreathe();
 void modeBreatheGradient();
 void modeEase();
 void modeGradient();
+void modeJuggle();
 void modeOff();
 void modeRainbow();
 void modeRainbowTrain();
-void modeSine();
 void modeSolid();
+void modeTemperature();
 
 // Set the order of modes in the Modeselektor.
 void (*modes[MAX_MODES])() = {
     &modeOff,
+    &modeTemperature,
     &modeSolid,
     &modeGradient,
     &modeEase,
-    &modeRainbow,
     &modeRainbowTrain,
+    &modeRainbow,
     &modeBreathe,
     &modeBreatheGradient,
-    &modeSine,
-    &modeOff
+    &modeJuggle
 };
 
 struct {
@@ -163,6 +164,19 @@ void modeSolid() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, pots.val));
 }
 
+// Fill all LEDs with a solid color on the temperature scale. The color
+// breathes in and out to another temperature, defined by the extra parameter.
+void modeTemperature() {
+    uint8_t wave;
+    uint8_t hue;
+
+    wave = sin8(animation(230));
+    hue = map8(wave, pots.hue, max(pots.var, pots.hue));
+
+    fill_solid(&leds[0], NUM_LEDS, HeatColor(hue));
+    FastLED.setBrightness(pots.val);
+}
+
 // Draw a linear gradient between two colors. The additional parameter defines
 // the destination hue. The same saturation and value applies to both colors.
 void modeGradient() {
@@ -224,16 +238,22 @@ void modeBreatheGradient() {
     fill_solid(&leds[0], NUM_LEDS, CHSV(hue, pots.sat, pots.val));
 }
 
-// Animate each LED's intensity according to a sine wave.
-void modeSine() {
-    uint8_t angle;
-    uint8_t value;
-    uint8_t an = animation(pots.var);
-    for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        angle = ledAngle(led);
-        value = sin8(angle + an);
-        value = map(value, 0, 255, 0, pots.val);
-        leds[led] = CHSV(pots.hue, pots.sat, value);
+// 1-N colored dots, weaving in and out of sync with each other. The variable
+// adjusts the number of dots between 1 and half the LED strip.
+//
+// This function is adapted from https://github.com/atuline/FastLED-Demos.
+void modeJuggle() {
+    uint8_t led;
+    uint8_t hue = pots.hue;
+    uint8_t dots = map8(pots.var, 1, NUM_LEDS / 2);
+    uint8_t step = 256 / dots;
+
+    fadeToBlackBy(leds, NUM_LEDS, 20);
+
+    for(uint8_t dot = 0; dot < dots; dot++) {
+        led = beatsin16(dot+6, 0, NUM_LEDS-1);
+        leds[led] |= CHSV(hue, pots.sat, pots.val);
+        hue += step;
     }
 }
 
