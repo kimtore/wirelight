@@ -177,9 +177,11 @@ void modeSolid() {
 // Draw a linear gradient between two colors. The additional parameter defines
 // the destination hue. The same saturation and value applies to both colors.
 void modeGradient() {
-    fill_gradient(&leds[0],
-                  0, CHSV(pots.hue, pots.sat, pots.val),
-                  NUM_LEDS-1, CHSV(pots.var, pots.sat, pots.val));
+    fill_gradient(
+        &leds[0],
+        0,          CHSV(pots.hue, pots.sat, pots.val),
+        NUM_LEDS-1, CHSV(pots.var, pots.sat, pots.val)
+    );
 }
 
 // Animate the rainbow. The hue parameter moves the rainbow back and forth,
