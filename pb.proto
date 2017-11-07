@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 message LED {
-    uint32 index = 1;
-    fixed32 rgb = 2;
+    uint64 serial = 1;
+    uint32 index = 2;
+    fixed32 rgb = 3;
+    bool render = 4;
 }

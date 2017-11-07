@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -16,11 +17,17 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
+var serial uint64
+
 var (
 	addr = flag.String("address", "blinkt:1230", "LEDServer address")
+	freq = flag.Int("freq", 4, "Frequency of updates")
 )
 
 func WriteLED(writer *bufio.Writer, led *pb.LED) error {
+	serial++
+	led.Serial = serial
+
 	payload, err := proto.Marshal(led)
 	if err != nil {
 		return fmt.Errorf("while generating protobuf payload: %s", err)
@@ -37,6 +44,13 @@ func WriteLED(writer *bufio.Writer, led *pb.LED) error {
 	}
 
 	return nil
+}
+
+func Render(writer *bufio.Writer) error {
+	led := &pb.LED{
+		Render: true,
+	}
+	return WriteLED(writer, led)
 }
 
 func Fill(writer *bufio.Writer, color uint32) error {
@@ -57,11 +71,6 @@ func Fill(writer *bufio.Writer, color uint32) error {
 	return nil
 }
 
-func Render(writer *bufio.Writer) {
-	writer.Write([]byte{'F'})
-	writer.Flush()
-}
-
 func main() {
 	sock, err := net.Dial("udp", *addr)
 	if err != nil {
@@ -72,15 +81,15 @@ func main() {
 	fmt.Printf("Sending datagrams to %s\n", *addr)
 
 	writer := bufio.NewWriter(sock)
+	duration := (1 * time.Second) / time.Duration(*freq)
 
 	var color uint32
 	for {
 		if color == 0 {
-			color = 255
+			color = rand.Uint32() >> 16
 		} else {
 			color = 0
 		}
-		//color = rand.Uint32() >> 16
 		err = Fill(writer, color)
 		if err != nil {
 			fmt.Printf("%s\n", err)
@@ -88,7 +97,7 @@ func main() {
 		}
 		Render(writer)
 
-		time.Sleep((1 * time.Second) / 24) // 24 fps
+		time.Sleep(duration)
 	}
 }
 
