@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+service LEDServer {
+    rpc Set(stream LED) returns (None);
+}
+
+message LED {
+    uint32 index = 1;
+    fixed32 rgb = 2;
+}
+
+message None {
+}
