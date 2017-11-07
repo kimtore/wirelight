@@ -1,0 +1,10 @@
+[Unit]
+Description=LED server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/ledserver
+Restart=always
+
+[Install]
+WantedBy=default.target
