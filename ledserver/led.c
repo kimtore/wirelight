@@ -1,5 +1,5 @@
 /*
- * LEDServer by Kim Tore Jensen.
+ * LEDServer by Kim Tore Jensen <https://github.com/ambientsound/wirelight>.
  *
  * This program drives LEDs from a Raspberry Pi Zero W using the rpi_ws281x
  * library and Google Protobuf messages.
@@ -56,11 +56,16 @@ static char VERSION[] = "XX.YY.ZZ";
 #define LED_COUNT               60
 
 ws2811_t ledstring;
-ws2811_led_t *strip;
 
 static uint8_t running = 1;
 
-void init() {
+static void ledstrip_clear(void) {
+    for (int i = 0; i < LED_COUNT; i++) {
+        ledstring.channel[0].leds[i] = 0;
+    }
+}
+
+void ledstrip_init() {
     ledstring.freq = TARGET_FREQ,
     ledstring.dmanum = DMA,
     ledstring.channel[0].gpionum = GPIO_PIN;
@@ -74,22 +79,17 @@ void init() {
     ledstring.channel[1].brightness = 0;
 }
 
-void strip_draw(void) {
-    for (int i = 0; i < LED_COUNT; i++) {
-        strip[i] = 128;
-    }
+void ledstrip_finish() {
+    ledstrip_clear();
+    ws2811_render(&ledstring);
+    ws2811_fini(&ledstring);
 }
 
-void strip_render(void) {
-    for (int i = 0; i < LED_COUNT; i++) {
-        ledstring.channel[0].leds[i] = strip[i];
+void ledstrip_assign(uint32_t led, uint32_t value) {
+    if (led >= LED_COUNT) {
+        return;
     }
-}
-
-void strip_clear(void) {
-    for (int i = 0; i < LED_COUNT; i++) {
-        strip[i] = 0;
-    }
+    ledstring.channel[0].leds[led] = value;
 }
 
 static void ctrl_c_handler(int signum)
@@ -111,11 +111,8 @@ int main(int argc, char *argv[])
 {
     ws2811_return_t ret;
 
-    init();
-
+    ledstrip_init();
     sprintf(VERSION, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
-
-    strip = (ws2811_led_t*) malloc(sizeof(ws2811_led_t) * LED_COUNT);
 
     setup_handlers();
 
@@ -127,8 +124,8 @@ int main(int argc, char *argv[])
 
     while (running)
     {
-        strip_draw();
-        strip_render();
+        ledstrip_assign(30, 255);
+        //ledstrip_render();
 
         if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
         {
@@ -140,11 +137,6 @@ int main(int argc, char *argv[])
         usleep(1000000 / 15);
     }
 
-    strip_clear();
-    strip_render();
-    ws2811_render(&ledstring);
-
-    ws2811_fini(&ledstring);
 
     printf ("\n");
     return ret;
