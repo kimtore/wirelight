@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "led.h"
+#include "pb.pb-c.h"
 
 #define HOST 0
 #define PORT "1230"
@@ -38,14 +39,16 @@ static void setup_handlers(void)
 }
 
 int main() {
-    int fd;
-    int err;
-    struct addrinfo hints;
-    struct addrinfo* ai = 0;
-    char buffer[548];
+    int                     fd;
+    int                     err;
+    struct addrinfo         hints;
+    struct addrinfo *       ai = 0;
+    char                    buffer[548];
     struct sockaddr_storage src_addr;
-    socklen_t src_addr_len = sizeof(src_addr);
-    ssize_t received;
+    socklen_t               src_addr_len = sizeof(src_addr);
+    ssize_t                 received;
+    uint64_t                count = 0;
+    LED *                   led;
 
     // create socket options for an UDP socket.
     memset(&hints, 0, sizeof(hints));
@@ -81,18 +84,22 @@ int main() {
     ledstrip_clear();
     ledstrip_render();
 
-    uint32_t count = 0;
     while (running) {
         received = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&src_addr, &src_addr_len);
+        ++count;
         if (received == -1) {
             fprintf(stderr, "%s", strerror(errno));
         } else if (received == sizeof(buffer)) {
-            printf("datagram too large for buffer: truncated\n");
+            fprintf(stderr, "datagram too large for buffer: truncated\n");
         } else {
-            printf("received datagram of size %d\n", received);
-            ledstrip_assign(count, 255*(count+1));
+            led = led__unpack(NULL, received, (const uint8_t *)buffer);
+            if (led == NULL) {
+                fprintf(stderr, "invalid protobuf message with size %d received; discarding.\n", received);
+                continue;
+            }
+            printf("ledstrip_assign(%d, %d)\n", led->index, led->rgb);
+            ledstrip_assign(led->index, led->rgb);
             ledstrip_render();
-            ++count;
         }
     }
 
@@ -100,7 +107,7 @@ int main() {
     ledstrip_finish();
     close(fd);
 
-    printf("\n");
+    printf("\nProcessed %llu datagrams.\n", count-1);
 
     return 0;
 }
