@@ -14,7 +14,7 @@
 #include "led.h"
 
 #define DMA                     5
-#define GPIO_PIN                18
+#define GPIO_PIN                10
 #define LED_COUNT               60
 #define MAX_BRIGHTNESS          80
 #define STRIP_TYPE              WS2812_STRIP
