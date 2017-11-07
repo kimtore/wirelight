@@ -94,7 +94,10 @@ int main() {
         } else {
             led = led__unpack(NULL, received, (const uint8_t *)buffer);
             if (led == NULL) {
-                // invalid messages are interpreted as "render all leds now".
+                fprintf(stderr, "invalid protobuf message with size %d received; discarding.\n", received);
+                continue;
+            }
+            if (led->render) {
                 ledstrip_render();
             } else {
                 ledstrip_assign(led->index, led->rgb);

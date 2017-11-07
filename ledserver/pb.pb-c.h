@@ -26,14 +26,18 @@ typedef struct _LED LED;
 struct  _LED
 {
   ProtobufCMessage base;
+  protobuf_c_boolean has_serial;
+  uint64_t serial;
   protobuf_c_boolean has_index;
   uint32_t index;
   protobuf_c_boolean has_rgb;
   uint32_t rgb;
+  protobuf_c_boolean has_render;
+  protobuf_c_boolean render;
 };
 #define LED__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&led__descriptor) \
-    , 0,0, 0,0 }
+    , 0,0, 0,0, 0,0, 0,0 }
 
 
 /* LED methods */
