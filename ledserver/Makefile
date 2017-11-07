@@ -23,7 +23,7 @@ led.o: led.c
 	gcc $(LED_FLAGS) -Wall -c led.c
 
 server.o: server.c
-	gcc -Wall -c server.cc
+	gcc -Wall -c server.c
 
 proto:
 	cd .. && protoc-c --c_out=ledserver pb.proto
