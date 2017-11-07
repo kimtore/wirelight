@@ -102,6 +102,7 @@ int main() {
             } else {
                 ledstrip_assign(led->index, led->rgb);
             }
+            led__free_unpacked(led, NULL);
         }
     }
 
