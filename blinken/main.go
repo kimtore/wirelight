@@ -69,7 +69,7 @@ func main() {
 	canvas := image.NewRGBA(rect)
 
 	go strip.Loop(canvas, *freq)
-	white(canvas)
+	northernLights(canvas)
 }
 
 func Rad(d float64) float64 {
@@ -82,6 +82,25 @@ func fill(canvas *image.RGBA, col color.Color) {
 	for x := b.Min.X; x < b.Max.X; x++ {
 		for y := b.Min.Y; y < b.Max.Y; y++ {
 			canvas.Set(x, y, col)
+		}
+	}
+}
+
+func northernLights(canvas *image.RGBA) {
+	b := canvas.Bounds()
+	old := make([]colorful.Color, b.Max.X*b.Max.Y)
+	for {
+		for angle := 0.0; angle < 360.0; angle++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				for y := b.Min.Y; y < b.Max.Y; y++ {
+					i := (y * b.Max.X) + x
+					col := colorful.Hsl(angle+rand.Float64()*50.0, 1, rand.Float64()*0.6)
+					step := col.BlendHcl(old[i], 0.92).Clamped()
+					canvas.Set(x, y, step)
+					old[i] = step
+				}
+			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 }
