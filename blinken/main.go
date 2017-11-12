@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"math/rand"
 	"net"
 	"os"
 	"time"
 
 	"github.com/ambientsound/wirelight/blinken/pb"
+	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
 )
 
@@ -67,7 +69,12 @@ func main() {
 	canvas := image.NewRGBA(rect)
 
 	go strip.Loop(canvas, *freq)
-	moo(canvas)
+	white(canvas)
+}
+
+func Rad(d float64) float64 {
+	const x = math.Pi / 180
+	return d * x
 }
 
 func fill(canvas *image.RGBA, col color.Color) {
@@ -79,16 +86,68 @@ func fill(canvas *image.RGBA, col color.Color) {
 	}
 }
 
-func moo(canvas *image.RGBA) {
+func white(canvas *image.RGBA) {
 	for {
-		col := color.RGBA{
-			R: uint8(rand.Int()),
-			G: uint8(rand.Int()),
-			B: uint8(rand.Int()),
-			A: 0,
+		hue := rand.Float64() * 360.0
+		for deg := 0.0; deg <= 180.0; deg += 1 {
+			l := math.Sin(Rad(deg))
+			col := colorful.Hsv(hue, 1.0, l*0.5).Clamped()
+			fill(canvas, col)
+			time.Sleep(time.Microsecond * 1500)
 		}
+		time.Sleep(time.Millisecond * 185)
+	}
+}
+
+func gradients(canvas *image.RGBA) {
+	var h, c, l float64
+	h = 0.0
+	c = 0.8
+	l = 0.5
+	_, _ = c, l
+	src := colorful.Hsv(h, 1, 1)
+	dst := colorful.Hsv(h, 1, 1)
+
+	for {
+		src = dst
+		h += 30
+		if h >= 360 {
+			h = 0
+		}
+		dst = colorful.Hsv(h, 1, 1)
+		fmt.Printf("hue=%.2f, blend %#v %#v\n", h, src, dst)
+
+		// interpolate between the two colors.
+		for n := 0.0; n < 1.0; n += 0.01 {
+			col := src.BlendHcl(dst, n).Clamped()
+			fill(canvas, col)
+			time.Sleep(time.Millisecond * 20)
+		}
+	}
+}
+
+func wheelHCL(canvas *image.RGBA) {
+	var h float64
+	for {
+		h += 1
+		if h > 360 {
+			h = 0
+		}
+		col := colorful.Hcl(h, 0.2, 0).Clamped()
 		fill(canvas, col)
-		fmt.Printf("Filled canvas with %#v\n", col)
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Millisecond * 10)
+	}
+}
+
+func wheelHSV(canvas *image.RGBA) {
+	var h float64
+	for {
+		h += 1
+		if h > 360 {
+			h = 0
+		}
+		col := colorful.Hsv(h, 1, 1)
+		fill(canvas, col)
+		time.Sleep(time.Millisecond * 10)
 	}
 }
