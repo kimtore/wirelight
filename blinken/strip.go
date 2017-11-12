@@ -3,7 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image"
+	"time"
 
+	"github.com/ambientsound/wirelight/blinken/lib"
 	"github.com/ambientsound/wirelight/blinken/pb"
 	"github.com/golang/protobuf/proto"
 )
@@ -13,13 +16,19 @@ var serial uint64
 
 // Strip represents a strip of LEDs.
 type Strip struct {
-	writer *bufio.Writer
+	writer      *bufio.Writer
+	refreshRate uint64
+	width       int
+	height      int
 }
 
 // NewStrip returns Strip.
-func NewStrip(writer *bufio.Writer) *Strip {
+func NewStrip(writer *bufio.Writer, width, height int, refreshRate uint64) *Strip {
 	return &Strip{
-		writer: writer,
+		writer:      writer,
+		refreshRate: refreshRate, // render all LEDs every 15th update
+		width:       width,
+		height:      height,
 	}
 }
 
@@ -27,6 +36,7 @@ func NewStrip(writer *bufio.Writer) *Strip {
 func (s *Strip) rpcLED(led *pb.LED) error {
 	serial++
 	led.Serial = serial
+	led.Render = (serial%s.refreshRate == 0)
 
 	payload, err := proto.Marshal(led)
 	if err != nil {
@@ -46,29 +56,33 @@ func (s *Strip) rpcLED(led *pb.LED) error {
 	return nil
 }
 
-// Render instructs the server to render all the LEDs.
-func (s *Strip) Render() error {
-	led := &pb.LED{
-		Render: true,
-	}
-	return s.rpcLED(led)
-}
-
-// Fill sets all the LEDs to one value.
-func (s *Strip) Fill(color uint32) error {
-	var i uint32
-
-	led := &pb.LED{
-		Rgb: color,
-	}
-
-	for i = 0; i < 60; i++ {
-		led.Index = i
-		err := s.rpcLED(led)
-		if err != nil {
-			return err
+// BitBlit transfers image data from an object implementing the Image interface
+// to a remote LED server.
+func (s *Strip) BitBlit(img image.Image) error {
+	led := &pb.LED{}
+	for x := 0; x < s.width; x++ {
+		for y := 0; y < s.height; y++ {
+			led.Index = uint32(y*s.width + x)
+			c := img.At(x, y)
+			led.Rgb = lib.RGBA(c)
+			err := s.rpcLED(led)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
+}
+
+// Loop renders the LEDs periodically. This function never returns, so be sure
+// to call it in a goroutine.
+func (s *Strip) Loop(img image.Image, freq int) {
+	c := cycleTime(freq)
+	for {
+		err := s.BitBlit(img)
+		if err != nil {
+			fmt.Printf("BitBlit: %s\n", err)
+		}
+		time.Sleep(c)
+	}
 }

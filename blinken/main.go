@@ -7,21 +7,46 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image"
+	"image/color"
 	"math/rand"
 	"net"
 	"os"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/pb"
 	flag "github.com/ogier/pflag"
 )
 
 var (
-	addr = flag.String("address", "blinkt:1230", "LEDServer address")
-	freq = flag.Int("freq", 4, "Frequency of updates")
+	addr   = flag.String("address", "blinkt:1230", "LEDServer address")
+	freq   = flag.Int("freq", 24, "Updates per second")
+	render = flag.Int64("render", 30, "Render strip every N led update")
 )
 
 func init() {
 	flag.Parse()
+}
+
+func cycleTime(freq int) time.Duration {
+	return (1 * time.Second) / time.Duration(freq)
+}
+
+// Fill sets all the LEDs to one value.
+func (s *Strip) Fill(color uint32) error {
+	led := &pb.LED{
+		Rgb: color,
+	}
+
+	for i := 0; i < s.width; i++ {
+		led.Index = uint32(i)
+		err := s.rpcLED(led)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func main() {
@@ -34,15 +59,63 @@ func main() {
 	}
 
 	writer := bufio.NewWriter(sock)
-	strip := NewStrip(writer)
+	strip := NewStrip(writer, 60, 1, uint64(*render))
+	rect := image.Rectangle{
+		Min: image.Point{0, 0},
+		Max: image.Point{60, 1},
+	}
+	canvas := image.NewRGBA(rect)
 
-	err = blink(strip, *freq)
-	fmt.Printf("%s\n", err)
+	go strip.Loop(canvas, *freq)
+	moo(canvas)
+}
+
+func fill(canvas *image.RGBA, col color.Color) {
+	b := canvas.Bounds()
+	for x := b.Min.X; x < b.Max.X; x++ {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			canvas.Set(x, y, col)
+		}
+	}
+}
+
+func moo(canvas *image.RGBA) {
+	for {
+		col := color.RGBA{
+			R: uint8(rand.Int()),
+			G: uint8(rand.Int()),
+			B: uint8(rand.Int()),
+			A: 0,
+		}
+		fill(canvas, col)
+		fmt.Printf("Filled canvas with %#v\n", col)
+		time.Sleep(time.Second * 1)
+	}
+}
+
+func gradient(s *Strip, freq int) error {
+	var color uint32
+	var shift uint16
+
+	c := cycleTime(freq)
+	for {
+		for v := 0; v <= 180; v += 4 {
+			color = uint32(v) << shift
+			err := s.Fill(color)
+			if err != nil {
+				return err
+			}
+			time.Sleep(c)
+		}
+		shift = (shift + 8) % 24
+	}
+
+	return nil
 }
 
 func blink(s *Strip, freq int) error {
 	var color uint32
-	duration := (1 * time.Second) / time.Duration(freq)
+	c := cycleTime(freq)
 
 	for {
 		if color == 0 {
@@ -54,9 +127,8 @@ func blink(s *Strip, freq int) error {
 		if err != nil {
 			return err
 		}
-		s.Render()
 
-		time.Sleep(duration)
+		time.Sleep(c)
 	}
 
 	return nil
