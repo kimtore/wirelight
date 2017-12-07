@@ -97,10 +97,9 @@ int main() {
                 fprintf(stderr, "invalid protobuf message with size %d received; discarding.\n", received);
                 continue;
             }
+            ledstrip_assign(led->index, led->rgb);
             if (led->render) {
                 ledstrip_render();
-            } else {
-                ledstrip_assign(led->index, led->rgb);
             }
             led__free_unpacked(led, NULL);
         }
