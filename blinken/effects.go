@@ -30,6 +30,12 @@ func northernLights(canvas *image.RGBA) {
 	}
 }
 
+func black(canvas *image.RGBA) {
+	for {
+		fill(canvas, colorful.Hsv(0, 0, 0))
+	}
+}
+
 func white(canvas *image.RGBA) {
 	for {
 		hue := rand.Float64() * 360.0
