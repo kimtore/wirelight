@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"os"
 	"time"
 
@@ -60,13 +59,4 @@ func main() {
 
 	go strip.Loop(canvas, *freq)
 	northernLights(canvas)
-}
-
-func fill(canvas *image.RGBA, col color.Color) {
-	b := canvas.Bounds()
-	for x := b.Min.X; x < b.Max.X; x++ {
-		for y := b.Min.Y; y < b.Max.Y; y++ {
-			canvas.Set(x, y, col)
-		}
-	}
 }
