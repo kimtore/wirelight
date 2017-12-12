@@ -15,8 +15,8 @@
 
 #define DMA                     5
 #define GPIO_PIN                10
-#define LED_COUNT               60
-#define MAX_BRIGHTNESS          80
+#define LED_COUNT               240
+#define MAX_BRIGHTNESS          255
 #define STRIP_TYPE              WS2812_STRIP
 #define TARGET_FREQ             WS2811_TARGET_FREQ
 
