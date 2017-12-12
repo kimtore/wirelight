@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	addr   = flag.String("address", "tcp://blinkt:1230", "LEDServer address")
-	freq   = flag.Int("freq", 8, "Updates per second")
-	render = flag.Int64("render", 240, "Render strip every N led update")
+	addr = flag.String("address", "tcp://blinkt:1230", "LEDServer address")
+	freq = flag.Int("freq", 24, "Update frequency")
+	cols = flag.Int("cols", 4, "Number of LED strips")
+	rows = flag.Int("rows", 60, "Number of LEDs in one strip")
 )
 
 func init() {
@@ -50,10 +51,10 @@ func main() {
 	}
 	defer sock.Close()
 
-	strip := NewStrip(sock, 240, 1, uint64(*render))
+	strip := NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
 	rect := image.Rectangle{
 		Min: image.Point{0, 0},
-		Max: image.Point{240, 1},
+		Max: image.Point{*rows, *cols},
 	}
 	canvas := image.NewRGBA(rect)
 
