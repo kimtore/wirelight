@@ -29,7 +29,7 @@ func northernLights(canvas *image.RGBA) {
 			for x := b.Min.X; x < b.Max.X; x++ {
 				for y := b.Min.Y; y < b.Max.Y; y++ {
 					i := (y * b.Max.X) + x
-					col := colorful.Hsl(angle+rand.Float64()*50.0, 1, rand.Float64()*0.6)
+					col := colorful.Hsl(angle+rand.Float64()*50.0, 1, rand.Float64()*0.1)
 					step := col.BlendHcl(old[i], 0.92).Clamped()
 					canvas.Set(x, y, step)
 					old[i] = step
@@ -59,6 +59,30 @@ func white(canvas *image.RGBA) {
 	}
 }
 
+// directionTest draws up a gradient on each strip.
+func directionTest(canvas *image.RGBA) {
+	c := 1.0
+	l := 0.05
+
+	src := colorful.Hcl(0.0, c, l)
+	dst := colorful.Hcl(160.0, c, l)
+	b := canvas.Bounds()
+	count := b.Max.X - b.Min.X
+	step := float64(1.0) / float64(count)
+
+	for {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			n := 0.0
+			for x := b.Min.X; x < b.Max.X; x++ {
+				n += step
+				col := src.BlendHcl(dst, n).Clamped()
+				canvas.Set(x, y, col)
+			}
+		}
+		time.Sleep(time.Millisecond * 1000)
+	}
+}
+
 func gradients(canvas *image.RGBA) {
 	var h, c, l float64
 	h = 0.0
@@ -83,6 +107,19 @@ func gradients(canvas *image.RGBA) {
 			fill(canvas, col)
 			time.Sleep(time.Millisecond * 20)
 		}
+	}
+}
+
+func staccatoWheel(canvas *image.RGBA) {
+	var h float64
+	for {
+		h += 31
+		if h > 360 {
+			h -= 360
+		}
+		col := colorful.Hsv(h, 1, 0.25).Clamped()
+		fill(canvas, col)
+		time.Sleep(time.Millisecond * 250)
 	}
 }
 
