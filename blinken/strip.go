@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"image"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/ambientsound/wirelight/blinken/lib"
 	"github.com/ambientsound/wirelight/blinken/pb"
 	"github.com/golang/protobuf/proto"
+	"github.com/pebbe/zmq4"
 )
 
 // The serial is increased by one every time Blinken sends a LED update.
@@ -16,16 +16,16 @@ var serial uint64
 
 // Strip represents a strip of LEDs.
 type Strip struct {
-	writer      *bufio.Writer
+	sock        *zmq4.Socket
 	refreshRate uint64
 	width       int
 	height      int
 }
 
 // NewStrip returns Strip.
-func NewStrip(writer *bufio.Writer, width, height int, refreshRate uint64) *Strip {
+func NewStrip(sock *zmq4.Socket, width, height int, refreshRate uint64) *Strip {
 	return &Strip{
-		writer:      writer,
+		sock:        sock,
 		refreshRate: refreshRate, // render all LEDs every 15th update
 		width:       width,
 		height:      height,
@@ -43,14 +43,9 @@ func (s *Strip) rpcLED(led *pb.LED) error {
 		return fmt.Errorf("while generating protobuf payload: %s", err)
 	}
 
-	_, err = s.writer.Write(payload)
+	_, err = s.sock.SendBytes(payload, 0)
 	if err != nil {
-		return fmt.Errorf("while writing to buffered io: %s", err)
-	}
-
-	err = s.writer.Flush()
-	if err != nil {
-		return fmt.Errorf("while sending data on UDP socket: %s", err)
+		return fmt.Errorf("while sending data using ZeroMQ: %s", err)
 	}
 
 	return nil
