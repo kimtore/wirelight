@@ -51,13 +51,31 @@ func (s *Strip) rpcLED(led *pb.LED) error {
 	return nil
 }
 
+// Index returns the physical position of a single LED.
+//
+// The LEDs are configured in a zig-zag pattern, as drawn below. The LED server
+// only knows a single strand, so we must perform the positional conversion here.
+//
+//     START.........................
+//                                  |
+//     ..............................
+//     |
+//     ...........................END
+//
+func (s *Strip) Index(x, y int) uint32 {
+	if y%2 == 0 {
+		return uint32(y*s.width + x)
+	}
+	return uint32(y*s.width + (s.width - x - 1))
+}
+
 // BitBlit transfers image data from an object implementing the Image interface
 // to a remote LED server.
 func (s *Strip) BitBlit(img image.Image) error {
 	led := &pb.LED{}
-	for x := 0; x < s.width; x++ {
-		for y := 0; y < s.height; y++ {
-			led.Index = uint32(y*s.width + x)
+	for y := 0; y < s.height; y++ {
+		for x := 0; x < s.width; x++ {
+			led.Index = s.Index(x, y)
 			c := img.At(x, y)
 			led.Rgb = lib.RGBA(c)
 			err := s.rpcLED(led)
