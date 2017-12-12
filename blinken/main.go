@@ -18,8 +18,8 @@ import (
 
 var (
 	addr   = flag.String("address", "blinkt:1230", "LEDServer address")
-	freq   = flag.Int("freq", 24, "Updates per second")
-	render = flag.Int64("render", 30, "Render strip every N led update")
+	freq   = flag.Int("freq", 8, "Updates per second")
+	render = flag.Int64("render", 240, "Render strip every N led update")
 )
 
 func init() {
@@ -40,10 +40,10 @@ func main() {
 	}
 
 	writer := bufio.NewWriter(sock)
-	strip := NewStrip(writer, 60, 1, uint64(*render))
+	strip := NewStrip(writer, 240, 1, uint64(*render))
 	rect := image.Rectangle{
 		Min: image.Point{0, 0},
-		Max: image.Point{60, 1},
+		Max: image.Point{240, 1},
 	}
 	canvas := image.NewRGBA(rect)
 
