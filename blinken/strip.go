@@ -20,6 +20,7 @@ type Strip struct {
 	refreshRate uint64
 	width       int
 	height      int
+	shutdown    chan int
 }
 
 // NewStrip returns Strip.
@@ -29,6 +30,7 @@ func NewStrip(sock *zmq4.Socket, width, height int, refreshRate uint64) *Strip {
 		refreshRate: refreshRate, // render all LEDs every 15th update
 		width:       width,
 		height:      height,
+		shutdown:    make(chan int, 1),
 	}
 }
 
@@ -87,15 +89,25 @@ func (s *Strip) BitBlit(img image.Image) error {
 	return nil
 }
 
-// Loop renders the LEDs periodically. This function never returns, so be sure
-// to call it in a goroutine.
+// Loop renders the LEDs periodically. This function never returns until
+// Close() is called, so be sure to call it in a goroutine.
 func (s *Strip) Loop(img image.Image, freq int) {
 	c := cycleTime(freq)
 	for {
-		err := s.BitBlit(img)
-		if err != nil {
-			fmt.Printf("BitBlit: %s\n", err)
+		select {
+		case <-s.shutdown:
+			return
+		default:
+			err := s.BitBlit(img)
+			if err != nil {
+				fmt.Printf("BitBlit: %s\n", err)
+			}
+			time.Sleep(c)
 		}
-		time.Sleep(c)
 	}
+}
+
+// Close turns all LEDs black and shuts down the rendering function.
+func (s *Strip) Close() {
+	s.shutdown <- 0
 }

@@ -5,21 +5,30 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"image"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/mqttlight"
+	MQTT "github.com/eclipse/paho.mqtt.golang"
 	flag "github.com/ogier/pflag"
 	"github.com/pebbe/zmq4"
 )
 
+const CLIENT_ID string = "blinken"
+
 var (
-	addr = flag.String("ledserver", "tcp://blinkt:1230", "LEDServer address")
-	freq = flag.Int("freq", 24, "Update frequency")
-	cols = flag.Int("cols", 4, "Number of LED strips")
-	rows = flag.Int("rows", 60, "Number of LEDs in one strip")
+	ledServerAddress  = flag.String("ledserver", "tcp://blinkt:1230", "LEDServer address")
+	freq              = flag.Int("freq", 24, "Update frequency")
+	cols              = flag.Int("cols", 4, "Number of LED strips")
+	rows              = flag.Int("rows", 60, "Number of LEDs in one strip")
+	mqttServerAddress = flag.String("mqtt", "tcp://127.0.0.1:1883", "The full url of the MQTT server to connect to")
+	mqttTopic         = flag.String("topic", "powerlamp/set", "Topic to subscribe to")
+	mqttUsername      = flag.String("username", "", "A username to authenticate to the MQTT server")
+	mqttPassword      = flag.String("password", "", "Password to match username")
 )
 
 func init() {
@@ -41,39 +50,103 @@ func zmqSocket(address string) (*zmq4.Socket, error) {
 		return nil, fmt.Errorf("while creating ZeroMQ socket: %s\n", err)
 	}
 
-	err = sock.Connect(*addr)
+	err = sock.Connect(address)
 	if err != nil {
-		return nil, fmt.Errorf("while connecting to %s: %s\n", *addr, err)
+		return nil, fmt.Errorf("while connecting to %s: %s\n", address, err)
 	}
 
 	return sock, nil
 }
 
-func main() {
-	fmt.Printf("Sending LED updates to %s.\n", *addr)
+func mqttClient(address, username, password, topic string, messages chan []byte) (MQTT.Client, error) {
+	flag.Parse()
 
-	sock, err := zmqSocket(*addr)
+	connOpts := MQTT.
+		NewClientOptions().
+		AddBroker(address).
+		SetClientID(CLIENT_ID).
+		SetCleanSession(true).
+		SetAutoReconnect(true)
+
+	if username != "" {
+		connOpts.SetUsername(username)
+		if password != "" {
+			connOpts.SetPassword(password)
+		}
+	}
+	//tlsConfig := &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
+	tlsConfig := &tls.Config{}
+	connOpts.SetTLSConfig(tlsConfig)
+
+	connOpts.OnConnect = func(c MQTT.Client) {
+		token := c.Subscribe(topic, byte(0), func(client MQTT.Client, message MQTT.Message) {
+			messages <- message.Payload()
+		})
+		token.Wait()
+		if token.Error() != nil {
+			panic(token.Error())
+		}
+	}
+
+	client := MQTT.NewClient(connOpts)
+	token := client.Connect()
+
+	if token.Wait() && token.Error() != nil {
+		return nil, token.Error()
+	}
+
+	return client, nil
+}
+
+func main() {
+	// Set up ZeroMQ connection to LEDServer.
+	sock, err := zmqSocket(*ledServerAddress)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
 	defer sock.Close()
 
+	// Set up the LED strip writer.
 	strip := NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
 	rect := image.Rectangle{
 		Min: image.Point{0, 0},
 		Max: image.Point{*rows, *cols},
 	}
 	canvas := image.NewRGBA(rect)
+	defer strip.Close()
 
+	// Send a continuous stream of LED updates through ZeroMQ.
+	fmt.Printf("Sending LED updates to %s.\n", *ledServerAddress)
 	go strip.Loop(canvas, *freq)
-	go split(canvas)
 
+	// Set up MQTT client for MQTT JSON light support
+	messages := make(chan []byte, 1024)
+	_, err = mqttClient(*mqttServerAddress, *mqttUsername, *mqttPassword, *mqttTopic, messages)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Set up signal handler
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	<-c
-	fmt.Printf("caught signal, exiting...\n")
-	black(canvas)
-	time.Sleep(time.Millisecond * 10)
-	os.Exit(0)
+
+	// Loop through MQTT messages.
+	for {
+		select {
+		case msg := <-messages:
+			command, err := mqttlight.Unmarshal(msg)
+			if err != nil {
+				fmt.Printf("ERROR while decoding message: %s\n", err)
+				return
+			}
+			fmt.Printf("%+v\n", command)
+			fmt.Printf("This is a message of type %+v.\n", command.Type())
+
+		case <-c:
+			fmt.Printf("caught signal, exiting...\n")
+			return
+		}
+	}
 }
