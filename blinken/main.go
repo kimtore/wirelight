@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	addr = flag.String("address", "tcp://blinkt:1230", "LEDServer address")
+	addr = flag.String("ledserver", "tcp://blinkt:1230", "LEDServer address")
 	freq = flag.Int("freq", 24, "Update frequency")
 	cols = flag.Int("cols", 4, "Number of LED strips")
 	rows = flag.Int("rows", 60, "Number of LEDs in one strip")
@@ -30,24 +30,31 @@ func cycleTime(freq int) time.Duration {
 	return (1 * time.Second) / time.Duration(freq)
 }
 
-func main() {
-	fmt.Printf("Sending LED updates to %s.\n", *addr)
-
+func zmqSocket(address string) (*zmq4.Socket, error) {
 	ctx, err := zmq4.NewContext()
 	if err != nil {
-		fmt.Printf("while creating ZeroMQ context: %s\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("while creating ZeroMQ context: %s\n", err)
 	}
 
 	sock, err := ctx.NewSocket(zmq4.PUB)
 	if err != nil {
-		fmt.Printf("while creating ZeroMQ socket: %s\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("while creating ZeroMQ socket: %s\n", err)
 	}
 
 	err = sock.Connect(*addr)
 	if err != nil {
-		fmt.Printf("while connecting to %s: %s\n", *addr, err)
+		return nil, fmt.Errorf("while connecting to %s: %s\n", *addr, err)
+	}
+
+	return sock, nil
+}
+
+func main() {
+	fmt.Printf("Sending LED updates to %s.\n", *addr)
+
+	sock, err := zmqSocket(*addr)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
 	defer sock.Close()
