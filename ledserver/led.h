@@ -8,6 +8,6 @@
 int ledstrip_init();
 int ledstrip_render();
 
-void ledstrip_assign(uint32_t led, uint32_t value);
+int ledstrip_assign(uint32_t led, uint32_t value);
 void ledstrip_clear(void);
 void ledstrip_finish();

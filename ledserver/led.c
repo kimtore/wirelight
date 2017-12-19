@@ -54,11 +54,15 @@ void ledstrip_clear(void) {
     }
 }
 
-void ledstrip_assign(uint32_t led, uint32_t value) {
+int ledstrip_assign(uint32_t led, uint32_t value) {
     if (led >= LED_COUNT) {
-        return;
+        return 0;
+    }
+    if (ledstring.channel[0].leds[led] == value) {
+        return 0;
     }
     ledstring.channel[0].leds[led] = value;
+    return 1;
 }
 
 int ledstrip_render() {

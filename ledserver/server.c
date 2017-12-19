@@ -41,6 +41,7 @@ static LED * recv_zmq_led(void * socket)
 }
 
 int main() {
+    int      updated = 1;
     uint64_t count = 0;
     LED *    led;
 
@@ -68,9 +69,10 @@ int main() {
             fprintf(stderr, "invalid protobuf message received; discarding.\n");
             continue;
         }
-        ledstrip_assign(led->index, led->rgb);
-        if (led->render) {
+        updated += ledstrip_assign(led->index, led->rgb);
+        if (led->render && updated != 0) {
             ledstrip_render();
+            updated = 0;
         }
         led__free_unpacked(led, NULL);
         ++count;
