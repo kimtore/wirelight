@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"math"
 	"math/rand"
 	"time"
@@ -12,12 +11,57 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
-func fill(canvas *image.RGBA, col color.Color) {
+// fillFunc executes a callback function for every LED in the canvas. The
+// callback function must return the new LED color. Arguments to the callback
+// function is the physical LED coordinates and the existing color.
+func fillFunc(canvas *image.RGBA, f func(x, y int, c colorful.Color) colorful.Color) {
 	b := canvas.Bounds()
 	for x := b.Min.X; x < b.Max.X; x++ {
 		for y := b.Min.Y; y < b.Max.Y; y++ {
-			canvas.Set(x, y, col)
+			c := lib.MakeColor(canvas.At(x, y))
+			col := f(x, y, c)
+			canvas.Set(x, y, col.Clamped())
 		}
+	}
+}
+
+func fill(canvas *image.RGBA, col colorful.Color) {
+	fillFunc(canvas, func(x, y int, c colorful.Color) colorful.Color {
+		return col
+	})
+}
+
+func emergency(canvas *image.RGBA) {
+	blue := colorful.LinearRgb(0, 0, 1.0).Clamped()
+	black := colorful.Hcl(0, 0, 0).Clamped()
+	_ = black
+	b := canvas.Bounds()
+	half := b.Max.Y / 2
+	offset := 0
+
+	for {
+		fill(canvas, black)
+		offset = (offset + half) % b.Max.Y
+		for blinks := 0; blinks < 2; blinks++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				for y := offset; y < offset+half; y++ {
+					canvas.Set(x, y, blue)
+				}
+			}
+			time.Sleep(time.Millisecond * 20)
+			for x := b.Min.X; x < b.Max.X; x++ {
+				for y := offset; y < offset+half; y++ {
+					canvas.Set(x, y, black)
+				}
+			}
+			time.Sleep(time.Millisecond * 20)
+			for x := b.Min.X; x < b.Max.X; x++ {
+				for y := offset; y < offset+half; y++ {
+					canvas.Set(x, y, blue)
+				}
+			}
+		}
+		time.Sleep(time.Millisecond * 20)
 	}
 }
 
@@ -35,18 +79,88 @@ func northernLights(canvas *image.RGBA) {
 					old[i] = step
 				}
 			}
-			time.Sleep(time.Millisecond * 100)
+			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
 
-func black(canvas *image.RGBA) {
+func northernLightsStable(canvas *image.RGBA) {
+	angle := 80.0
+	angle = 180.0
+	def := colorful.Hcl(angle, 1.0, 0.05)
+	fill(canvas, def)
 	for {
-		fill(canvas, colorful.Hsv(0, 0, 0))
+		fillFunc(canvas, func(x, y int, c colorful.Color) colorful.Color {
+			if rand.Intn(100) != 0 {
+				return def.BlendRgb(c, 0.98)
+			}
+			a := 180.0 * (1.0 / float64(rand.Intn(500)+1))
+			return colorful.Hcl(angle+a, 1, rand.Float64()*0.1)
+		})
+		time.Sleep(time.Millisecond * 10)
 	}
 }
 
+func black(canvas *image.RGBA) {
+	fill(canvas, colorful.Hsv(0, 0, 0))
+}
+
 func white(canvas *image.RGBA) {
+	fill(canvas, colorful.Hsv(0, 0, 1.0))
+}
+
+func snake(canvas *image.RGBA) {
+	col := colorful.Hcl(0, 1, 0.1)
+	black(canvas)
+	b := canvas.Bounds()
+	for {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				canvas.Set(x, y, col)
+				time.Sleep(time.Millisecond * 40)
+			}
+		}
+	}
+}
+
+func blinkWhite(canvas *image.RGBA) {
+	for {
+		fill(canvas, colorful.Hcl(0, 0, 1.0))
+		time.Sleep(time.Millisecond * 1000)
+		fill(canvas, colorful.Hcl(0, 0, 0))
+		time.Sleep(time.Millisecond * 1000)
+	}
+}
+
+func split(canvas *image.RGBA) {
+	l := 0.15
+	left := colorful.Hcl(30.0, 1.0, l).Clamped()
+	right := colorful.Hcl(180.0, 1.0, l).Clamped()
+	b := canvas.Bounds()
+	half := b.Max.Y / 2
+
+	for {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			for y := b.Min.Y; y < half; y++ {
+				canvas.Set(x, y, left)
+			}
+			for y := half; y < b.Max.Y; y++ {
+				canvas.Set(x, y, right)
+			}
+		}
+		time.Sleep(time.Millisecond * 1000)
+	}
+}
+
+func fullBlue(canvas *image.RGBA) {
+	for {
+		col := colorful.Hcl(80, 1.0, 1.0)
+		fill(canvas, col)
+		time.Sleep(time.Microsecond * 1000)
+	}
+}
+
+func superGradients(canvas *image.RGBA) {
 	for {
 		hue := rand.Float64() * 360.0
 		for deg := 0.0; deg <= 180.0; deg += 1 {
@@ -132,7 +246,7 @@ func wheelHCL(canvas *image.RGBA) {
 		}
 		col := colorful.Hcl(h, 0.2, 0).Clamped()
 		fill(canvas, col)
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 100)
 	}
 }
 
@@ -145,6 +259,6 @@ func wheelHSV(canvas *image.RGBA) {
 		}
 		col := colorful.Hsv(h, 1, 1)
 		fill(canvas, col)
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 50)
 	}
 }
