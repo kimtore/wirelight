@@ -1,7 +1,13 @@
 // package mqttlight provides support for the Home-Assistant light.mqtt_json component.
 package mqttlight
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"image/color"
+
+	"github.com/ambientsound/wirelight/blinken/lib"
+	colorful "github.com/lucasb-eyer/go-colorful"
+)
 
 // Which kind of JSON message was sent.
 type CommandType int
@@ -18,12 +24,12 @@ const (
 
 // Command holds the message from the Home-Assistant
 type Command struct {
-	Brightness int
+	Brightness uint8
 	Color_temp int
 	Color      struct {
-		R int
-		G int
-		B int
+		R uint8
+		G uint8
+		B uint8
 	}
 	Effect      string
 	State       string
@@ -58,4 +64,12 @@ func (c Command) Type() CommandType {
 		return State
 	}
 	return Unknown
+}
+
+func (c Command) TransformColor(existing colorful.Color) colorful.Color {
+	switch c.Type() {
+	case RGB:
+		return lib.MakeColor(color.RGBA{c.Color.R, c.Color.G, c.Color.B, 0})
+	}
+	return colorful.WarmColor()
 }

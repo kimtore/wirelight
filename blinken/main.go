@@ -14,6 +14,7 @@ import (
 
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
 	"github.com/pebbe/zmq4"
 )
@@ -137,12 +138,14 @@ func main() {
 		select {
 		case msg := <-messages:
 			command, err := mqttlight.Unmarshal(msg)
-			if err != nil {
-				fmt.Printf("ERROR while decoding message: %s\n", err)
-				return
-			}
 			fmt.Printf("%+v\n", command)
-			fmt.Printf("This is a message of type %+v.\n", command.Type())
+			if err != nil {
+				fmt.Printf("while decoding JSON message: %s\n", err)
+				continue
+			}
+			newColor := command.TransformColor(colorful.Color{})
+			fill(canvas, newColor)
+			//fmt.Printf("This is a message of type %+v.\n", command.Type())
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")
