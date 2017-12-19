@@ -25,11 +25,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
 func onMessageReceived(client MQTT.Client, message MQTT.Message) {
-	fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
+	//fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
+	command, err := mqttlight.Unmarshal(message.Payload())
+	if err != nil {
+		fmt.Printf("ERROR while decoding message: %s\n", err)
+		return
+	}
+	fmt.Printf("%+v\n", command)
+	fmt.Printf("This is a message of type %+v.\n", command.Type())
 }
 
 func main() {
