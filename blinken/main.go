@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"os/signal"
 	"time"
 
 	flag "github.com/ogier/pflag"
@@ -59,5 +60,13 @@ func main() {
 	canvas := image.NewRGBA(rect)
 
 	go strip.Loop(canvas, *freq)
-	northernLights(canvas)
+	go split(canvas)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	fmt.Printf("caught signal, exiting...\n")
+	black(canvas)
+	time.Sleep(time.Millisecond * 10)
+	os.Exit(0)
 }
