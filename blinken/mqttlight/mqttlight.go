@@ -66,10 +66,15 @@ func (c Command) Type() CommandType {
 	return Unknown
 }
 
+func (c Command) On() bool {
+	return c.State == "ON"
+
+}
+
 func (c Command) TransformColor(existing colorful.Color) colorful.Color {
 	switch c.Type() {
 	case RGB:
 		return lib.MakeColor(color.RGBA{c.Color.R, c.Color.G, c.Color.B, 0})
 	}
-	return colorful.WarmColor()
+	return existing
 }

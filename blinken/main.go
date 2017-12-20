@@ -133,6 +133,9 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
+	// Cache the last used color.
+	oldColor := colorful.Color{}
+
 	// Loop through MQTT messages.
 	for {
 		select {
@@ -143,8 +146,13 @@ func main() {
 				fmt.Printf("while decoding JSON message: %s\n", err)
 				continue
 			}
-			newColor := command.TransformColor(colorful.Color{})
-			fill(canvas, newColor)
+			if command.On() {
+				newColor := command.TransformColor(oldColor)
+				fill(canvas, newColor)
+				oldColor = newColor
+			} else {
+				fill(canvas, colorful.Color{})
+			}
 			//fmt.Printf("This is a message of type %+v.\n", command.Type())
 
 		case <-c:
