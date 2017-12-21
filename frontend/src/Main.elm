@@ -9,13 +9,13 @@ import Html.Events exposing (onInput)
 
 
 type alias Model =
-    { hue : ColorParam
-    , chroma : ColorParam
-    , luminance : ColorParam
+    { hue : ColorValue
+    , chroma : ColorValue
+    , luminance : ColorValue
     }
 
 
-type alias ColorParam =
+type alias ColorValue =
     Int
 
 
@@ -44,17 +44,17 @@ type Msg
     | HclChange HclParam String
 
 
-colorFraction : ColorParam -> Float
+colorFraction : ColorValue -> Float
 colorFraction c =
     toFloat c / 65535
 
 
-colorFractionString : ColorParam -> String
+colorFractionString : ColorValue -> String
 colorFractionString c =
     String.left 6 (toString (colorFraction c))
 
 
-zint : String -> ColorParam
+zint : String -> ColorValue
 zint s =
     Result.withDefault 0 (String.toInt s)
 
@@ -79,7 +79,7 @@ update msg model =
 ---- VIEW ----
 
 
-slider : String -> HclParam -> ColorParam -> Html Msg
+slider : String -> HclParam -> ColorValue -> Html Msg
 slider title hclparam colorvalue =
     div [ class "slider" ]
         [ h2 [] [ text (title ++ ": " ++ colorFractionString colorvalue) ]
