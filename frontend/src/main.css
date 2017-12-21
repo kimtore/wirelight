@@ -7,18 +7,19 @@
  */
 
 body {
-  font-family: 'Source Sans Pro', 'Trebuchet MS', 'Lucida Grande', 'Bitstream Vera Sans', 'Helvetica Neue', sans-serif;
-  margin: 0;
-  text-align: center;
-  color: #a74647;
-  background: black;
+    font-family: 'Source Sans Pro', 'Trebuchet MS', 'Lucida Grande', 'Bitstream Vera Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    text-align: center;
+    background: black;
+    color: #aaa;
 }
 
 h1 {
-  font-size: 30px;
+    font-size: 2em;
+    color: #724ca0;
 }
 
-img {
-  margin: 20px 0;
-  max-width: 200px;
+h2 {
+    font-size: 1.25em;
+    color: #728940;
 }
