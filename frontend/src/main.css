@@ -23,3 +23,14 @@ h2 {
     font-size: 1.25em;
     color: #728940;
 }
+
+div.slider {
+    float: left;
+    width: 33%;
+}
+
+input[type=range] {
+    width: 3em;
+    height: 16em;
+    -webkit-appearance: slider-vertical; /* WebKit */
+}
