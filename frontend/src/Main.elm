@@ -126,11 +126,15 @@ view model =
 ---- PROGRAM ----
 
 
+subscriptions model =
+    WebSocket.keepAlive "ws://nova:8011/"
+
+
 main : Program Never Model Msg
 main =
     Html.program
         { view = view
         , init = init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }
