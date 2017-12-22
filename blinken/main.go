@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
+	"github.com/ambientsound/wirelight/blinken/ws"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
@@ -129,6 +130,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set up Websockets server
+	wsMessages := make(chan colorful.Color, 1024)
+	go ws.Serve("0.0.0.0:8011", "/", wsMessages)
+
 	// Set up signal handler
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -154,6 +159,10 @@ func main() {
 				fill(canvas, colorful.Color{})
 			}
 			//fmt.Printf("This is a message of type %+v.\n", command.Type())
+
+		case msg := <-wsMessages:
+			//fmt.Printf("%+v\n", msg)
+			fill(canvas, msg)
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")
