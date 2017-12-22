@@ -72,7 +72,7 @@ colorObject m =
 
 sendColors : Model -> Cmd Msg
 sendColors model =
-    WebSocket.send "ws://localhost:8011/" (toString (Json.Encode.encode 0 (colorObject model)))
+    WebSocket.send "ws://nova:8011/" (Json.Encode.encode 2 (colorObject model))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -114,9 +114,11 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Any Colour You Like" ]
-        , slider "Hue" Hue model.hue
-        , slider "Chroma" Chroma model.chroma
-        , slider "Luminance" Luminance model.luminance
+        , div [ class "sliders" ]
+            [ slider "H" Hue model.hue
+            , slider "C" Chroma model.chroma
+            , slider "L" Luminance model.luminance
+            ]
         ]
 
 
