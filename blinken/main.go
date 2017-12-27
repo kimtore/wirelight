@@ -147,7 +147,8 @@ func main() {
 	terminate := make(chan int, 1)
 
 	// set up default effect
-	ef = effect.Effects["solid"]
+	effectName := "northernLights"
+	ef = effect.Effects[effectName]
 	ef.Palette["default"] = colorful.Hsv(40, 1, 0.15)
 	go effect.Run(ef, terminate, canvas)
 
@@ -172,7 +173,7 @@ func main() {
 
 		case msg := <-wsMessages:
 			terminate <- 1
-			ef = effect.Effects["solid"]
+			ef = effect.Effects[effectName]
 			ef.Palette["default"] = msg
 			go effect.Run(ef, terminate, canvas)
 
