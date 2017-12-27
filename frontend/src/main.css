@@ -1,5 +1,7 @@
 /**
- * Colors:
+ * Any Colour You Like
+ *
+ * Theme colors:
  *
  * #724ca0
  * #728940
@@ -29,13 +31,10 @@ h2 {
     color: #728940;
 }
 
-input[type=range] {
-    width: 3em;
-    -webkit-appearance: slider-vertical; /* WebKit */
-}
-
-
-/* Fette saftig css */
+/**
+ * Centered, full-height sliders using flex layout.
+ * Code by https://github.com/stentotre
+ */
 html,
 body {
 	min-height: 100%;
@@ -92,6 +91,62 @@ body {
     width: 8em;
 }
 
-.sliders .slider input {
+/**
+ * Slider styles.
+ * Initially generated using http://danielstern.ca/range.css.
+ */
+
+input[type=range] {
+	-webkit-appearance: slider-vertical;
 	height: 100%;
+}
+
+input[type=range]:focus {
+	outline: none;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+	height: 100%;
+	width: 10px;
+	cursor: pointer;
+	box-shadow: 0px 0px 0px #000000, 0px 0px 0px #0d0d0d;
+	background: #728940;
+	border-radius: 0px;
+	border: 0px solid #010101;
+}
+
+input[type=range]::-webkit-slider-thumb {
+	box-shadow: 0px 0px 0px #000000, 0px 0px 0px #0d0d0d;
+	border: 0px solid #000000;
+	height: 50px;
+	width: 50px;
+	border-radius: 50px;
+	background: #724ca0;
+	cursor: pointer;
+	-webkit-appearance: slider-vertical;
+	margin-left: -20px;
+}
+
+input[type=range]:focus::-webkit-slider-runnable-track {
+	background: #758c42;
+}
+
+input[type=range]::-moz-range-track {
+	height: 100%;
+	width: 10px;
+	cursor: pointer;
+	box-shadow: 0px 0px 0px #000000, 0px 0px 0px #0d0d0d;
+	background: #728940;
+	border-radius: 0px;
+	border: 0px solid #010101;
+}
+
+input[type=range]::-moz-range-thumb {
+	box-shadow: 0px 0px 0px #000000, 0px 0px 0px #0d0d0d;
+	border: 0px solid #000000;
+	height: 50px;
+	width: 50px;
+	border-radius: 50px;
+	background: #724ca0;
+	cursor: pointer;
 }
