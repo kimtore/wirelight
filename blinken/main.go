@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/effect"
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	"github.com/ambientsound/wirelight/blinken/ws"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -153,16 +154,16 @@ func main() {
 			}
 			if command.On() {
 				newColor := command.TransformColor(oldColor)
-				fill(canvas, newColor)
+				effect.Fill(canvas, newColor)
 				oldColor = newColor
 			} else {
-				fill(canvas, colorful.Color{})
+				effect.Fill(canvas, colorful.Color{})
 			}
 			//fmt.Printf("This is a message of type %+v.\n", command.Type())
 
 		case msg := <-wsMessages:
 			//fmt.Printf("%+v\n", msg)
-			fill(canvas, msg)
+			effect.Fill(canvas, msg)
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")

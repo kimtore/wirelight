@@ -7,29 +7,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/effect"
 	"github.com/ambientsound/wirelight/blinken/lib"
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
-
-// fillFunc executes a callback function for every LED in the canvas. The
-// callback function must return the new LED color. Arguments to the callback
-// function is the physical LED coordinates and the existing color.
-func fillFunc(canvas *image.RGBA, f func(x, y int, c colorful.Color) colorful.Color) {
-	b := canvas.Bounds()
-	for x := b.Min.X; x < b.Max.X; x++ {
-		for y := b.Min.Y; y < b.Max.Y; y++ {
-			c := lib.MakeColor(canvas.At(x, y))
-			col := f(x, y, c)
-			canvas.Set(x, y, col.Clamped())
-		}
-	}
-}
-
-func fill(canvas *image.RGBA, col colorful.Color) {
-	fillFunc(canvas, func(x, y int, c colorful.Color) colorful.Color {
-		return col
-	})
-}
 
 func emergency(canvas *image.RGBA) {
 	blue := colorful.LinearRgb(0, 0, 1.0).Clamped()
@@ -40,7 +21,7 @@ func emergency(canvas *image.RGBA) {
 	offset := 0
 
 	for {
-		fill(canvas, black)
+		effect.Fill(canvas, black)
 		offset = (offset + half) % b.Max.Y
 		for blinks := 0; blinks < 2; blinks++ {
 			for x := b.Min.X; x < b.Max.X; x++ {
@@ -88,9 +69,9 @@ func northernLightsStable(canvas *image.RGBA) {
 	angle := 80.0
 	angle = 180.0
 	def := colorful.Hcl(angle, 1.0, 0.05)
-	fill(canvas, def)
+	effect.Fill(canvas, def)
 	for {
-		fillFunc(canvas, func(x, y int, c colorful.Color) colorful.Color {
+		effect.FillFunc(canvas, func(x, y int, c colorful.Color) colorful.Color {
 			if rand.Intn(100) != 0 {
 				return def.BlendRgb(c, 0.98)
 			}
@@ -102,11 +83,11 @@ func northernLightsStable(canvas *image.RGBA) {
 }
 
 func black(canvas *image.RGBA) {
-	fill(canvas, colorful.Hsv(0, 0, 0))
+	effect.Fill(canvas, colorful.Hsv(0, 0, 0))
 }
 
 func white(canvas *image.RGBA) {
-	fill(canvas, colorful.Hsv(0, 0, 1.0))
+	effect.Fill(canvas, colorful.Hsv(0, 0, 1.0))
 }
 
 func snake(canvas *image.RGBA) {
@@ -125,9 +106,9 @@ func snake(canvas *image.RGBA) {
 
 func blinkWhite(canvas *image.RGBA) {
 	for {
-		fill(canvas, colorful.Hcl(0, 0, 1.0))
+		effect.Fill(canvas, colorful.Hcl(0, 0, 1.0))
 		time.Sleep(time.Millisecond * 1000)
-		fill(canvas, colorful.Hcl(0, 0, 0))
+		effect.Fill(canvas, colorful.Hcl(0, 0, 0))
 		time.Sleep(time.Millisecond * 1000)
 	}
 }
@@ -155,7 +136,7 @@ func split(canvas *image.RGBA) {
 func fullBlue(canvas *image.RGBA) {
 	for {
 		col := colorful.Hcl(80, 1.0, 1.0)
-		fill(canvas, col)
+		effect.Fill(canvas, col)
 		time.Sleep(time.Microsecond * 1000)
 	}
 }
@@ -166,7 +147,7 @@ func superGradients(canvas *image.RGBA) {
 		for deg := 0.0; deg <= 180.0; deg += 1 {
 			l := math.Sin(lib.Rad(deg))
 			col := colorful.Hsv(hue, 1.0, l*0.5).Clamped()
-			fill(canvas, col)
+			effect.Fill(canvas, col)
 			time.Sleep(time.Microsecond * 1500)
 		}
 		time.Sleep(time.Millisecond * 185)
@@ -218,7 +199,7 @@ func gradients(canvas *image.RGBA) {
 		// interpolate between the two colors.
 		for n := 0.0; n < 1.0; n += 0.01 {
 			col := src.BlendHcl(dst, n).Clamped()
-			fill(canvas, col)
+			effect.Fill(canvas, col)
 			time.Sleep(time.Millisecond * 20)
 		}
 	}
@@ -232,7 +213,7 @@ func staccatoWheel(canvas *image.RGBA) {
 			h -= 360
 		}
 		col := colorful.Hsv(h, 1, 0.25).Clamped()
-		fill(canvas, col)
+		effect.Fill(canvas, col)
 		time.Sleep(time.Millisecond * 250)
 	}
 }
@@ -245,7 +226,7 @@ func wheelHCL(canvas *image.RGBA) {
 			h = 0
 		}
 		col := colorful.Hcl(h, 0.2, 0).Clamped()
-		fill(canvas, col)
+		effect.Fill(canvas, col)
 		time.Sleep(time.Millisecond * 100)
 	}
 }
@@ -258,7 +239,7 @@ func wheelHSV(canvas *image.RGBA) {
 			h = 0
 		}
 		col := colorful.Hsv(h, 1, 1)
-		fill(canvas, col)
+		effect.Fill(canvas, col)
 		time.Sleep(time.Millisecond * 50)
 	}
 }
