@@ -124,8 +124,8 @@ func main() {
 	go strip.Loop(canvas, *freq)
 
 	// Set up MQTT client for MQTT JSON light support
-	messages := make(chan []byte, 1024)
-	_, err = mqttClient(*mqttServerAddress, *mqttUsername, *mqttPassword, *mqttTopic, messages)
+	mqttMessages := make(chan []byte, 1024)
+	_, err = mqttClient(*mqttServerAddress, *mqttUsername, *mqttPassword, *mqttTopic, mqttMessages)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
@@ -142,10 +142,19 @@ func main() {
 	// Cache the last used color.
 	oldColor := colorful.Color{}
 
+	// termination
+	var ef effect.Effect
+	terminate := make(chan int, 1)
+
+	// set up default effect
+	ef = effect.Effects["solid"]
+	ef.Palette["default"] = colorful.Hsv(40, 1, 0.15)
+	go effect.Run(ef, terminate, canvas)
+
 	// Loop through MQTT messages.
 	for {
 		select {
-		case msg := <-messages:
+		case msg := <-mqttMessages:
 			command, err := mqttlight.Unmarshal(msg)
 			fmt.Printf("%+v\n", command)
 			if err != nil {
@@ -162,8 +171,10 @@ func main() {
 			//fmt.Printf("This is a message of type %+v.\n", command.Type())
 
 		case msg := <-wsMessages:
-			//fmt.Printf("%+v\n", msg)
-			effect.Fill(canvas, msg)
+			terminate <- 1
+			ef = effect.Effects["solid"]
+			ef.Palette["default"] = msg
+			go effect.Run(ef, terminate, canvas)
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")
