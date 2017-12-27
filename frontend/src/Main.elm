@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, h1, h2, input)
+import Html exposing (Html, text, div, h1, h2, h3, input)
 import Html.Attributes exposing (src, type_, class, min, max, value)
 import Html.Events exposing (onInput)
 import Json.Encode
@@ -98,7 +98,8 @@ update msg model =
 slider : String -> HclParam -> ColorValue -> Html Msg
 slider title hclparam colorvalue =
     div [ class "slider" ]
-        [ h2 [] [ text (title ++ ": " ++ colorFractionString colorvalue) ]
+        [ h2 [] [ text title ]
+        , h3 [] [ text (colorFractionString colorvalue) ]
         , input
             [ type_ "range"
             , Html.Attributes.min "0"
@@ -115,9 +116,9 @@ view model =
     div []
         [ h1 [] [ text "Any Colour You Like" ]
         , div [ class "sliders" ]
-            [ slider "H" Hue model.hue
-            , slider "C" Chroma model.chroma
-            , slider "L" Luminance model.luminance
+            [ slider "Hue" Hue model.hue
+            , slider "Chroma" Chroma model.chroma
+            , slider "Luminance" Luminance model.luminance
             ]
         ]
 
