@@ -21,6 +21,7 @@ type alias Model =
     , hue : ColorValue
     , chroma : ColorValue
     , luminance : ColorValue
+    , serverState : String
     }
 
 
@@ -34,6 +35,7 @@ init =
       , hue = 0
       , chroma = 0
       , luminance = 0
+      , serverState = ""
       }
     , Cmd.none
     )
@@ -60,6 +62,7 @@ type HclParam
 type Msg
     = NoOp
     | SendColors
+    | ServerState String
     | EffectChange String
     | HclChange HclParam String
 
@@ -111,6 +114,9 @@ update msg model =
 
         SendColors ->
             ( model, sendColors model )
+
+        ServerState s ->
+            ( { model | serverState = s }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -167,7 +173,7 @@ view model =
 
 
 subscriptions model =
-    WebSocket.keepAlive "ws://nova:8011/"
+    WebSocket.listen "ws://nova:8011/" ServerState
 
 
 main : Program Never Model Msg

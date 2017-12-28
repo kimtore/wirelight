@@ -43,6 +43,12 @@ func Serve(addr, path string, messages chan Message) {
 			return
 		}
 
+		err = conn.WriteMessage(websocket.TextMessage, []byte("foobar"))
+		if err != nil {
+			log.Printf("while sending initial message: %s\n", err)
+			return
+		}
+
 		for {
 			_, payload, err := conn.ReadMessage()
 			if err != nil {
