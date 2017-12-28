@@ -11,6 +11,7 @@ import (
 )
 
 type Message struct {
+	Effect    string
 	Hue       uint16
 	Chroma    uint16
 	Luminance uint16
@@ -26,7 +27,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     checkOrigin,
 }
 
-func makeColor(m Message) colorful.Color {
+func MakeColor(m Message) colorful.Color {
 	return colorful.Hcl(
 		float64(m.Hue)/65535.0*360,
 		float64(m.Chroma)/65535.0,
@@ -34,7 +35,7 @@ func makeColor(m Message) colorful.Color {
 	)
 }
 
-func Serve(addr, path string, messages chan colorful.Color) {
+func Serve(addr, path string, messages chan Message) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -54,7 +55,7 @@ func Serve(addr, path string, messages chan colorful.Color) {
 				log.Printf("while unmarshalling: %s\n", err)
 				return
 			}
-			messages <- makeColor(m)
+			messages <- m
 		}
 	})
 

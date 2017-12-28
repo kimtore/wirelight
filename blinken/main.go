@@ -132,7 +132,7 @@ func main() {
 	}
 
 	// Set up Websockets server
-	wsMessages := make(chan colorful.Color, 1024)
+	wsMessages := make(chan ws.Message, 1024)
 	go ws.Serve("0.0.0.0:8011", "/", wsMessages)
 
 	// Set up signal handler
@@ -146,10 +146,8 @@ func main() {
 	var ef effect.Effect
 	terminate := make(chan int, 1)
 
-	// set up default effect
-	effectName := "northernLights"
-	ef = effect.Effects[effectName]
-	ef.Palette["default"] = colorful.Hsv(40, 1, 0.15)
+	// Default effect is to switch off the lights.
+	ef = effect.Effects["off"]
 	go effect.Run(ef, terminate, canvas)
 
 	// Loop through MQTT messages.
@@ -173,8 +171,9 @@ func main() {
 
 		case msg := <-wsMessages:
 			terminate <- 1
-			ef = effect.Effects[effectName]
-			ef.Palette["default"] = msg
+			ef = effect.Effects[msg.Effect]
+			c := ws.MakeColor(msg)
+			ef.Palette["default"] = c
 			go effect.Run(ef, terminate, canvas)
 
 		case <-c:
