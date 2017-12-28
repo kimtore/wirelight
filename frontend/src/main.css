@@ -20,20 +20,22 @@ body {
 }
 
 h1 {
-    font-size: 2em;
-    margin: 1em 0 0.25em;
+    font-size: 1.5em;
+    margin: 1em 0;
 }
 
 h2 {
-    font-size: 1.25em;
+    font-size: 1.15em;
     margin: 1em 0 0.25em;
     color: #90c0a1;
+    display: inline;
 }
 
 h3 {
-    font-size: 1.15em;
-    margin: 0.5em 0 0.25em;
+    font-size: 1em;
+    margin: 0.5em 0 0.25em 1em;
     color: #73a0c8;
+    display: inline;
 }
 
 #root {
@@ -49,7 +51,7 @@ h3 {
 input[type=range] {
     -webkit-appearance: none;
     width: 100%;
-    margin: 20.8px 0;
+    margin: 3em 0;
 }
 input[type=range]:focus {
     outline: none;
