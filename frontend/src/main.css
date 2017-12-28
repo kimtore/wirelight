@@ -43,6 +43,16 @@ h3 {
     margin: 0 auto;
 }
 
+select {
+    width: 100%;
+    margin: 1em 0 2em;
+    box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+    background: #73a0c8;
+    border-radius: 1.3px;
+    border: 0.2px solid #010101;
+    font-size: 1em;
+}
+
 /**
  * Slider styles.
  * Initially generated using http://danielstern.ca/range.css.

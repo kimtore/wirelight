@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, h1, h2, h3, input)
+import Html exposing (Html, text, div, h1, h2, h3, input, select, option)
 import Html.Attributes exposing (src, type_, class, min, max, value)
 import Html.Events exposing (onInput)
 import Json.Encode
@@ -10,8 +10,15 @@ import WebSocket
 ---- MODEL ----
 
 
+type alias Effect =
+    { key : String
+    , name : String
+    }
+
+
 type alias Model =
-    { hue : ColorValue
+    { effect : String
+    , hue : ColorValue
     , chroma : ColorValue
     , luminance : ColorValue
     }
@@ -23,12 +30,21 @@ type alias ColorValue =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { hue = 0
+    ( { effect = "off"
+      , hue = 0
       , chroma = 0
       , luminance = 0
       }
     , Cmd.none
     )
+
+
+effects : List Effect
+effects =
+    [ { key = "off", name = "Darkness" }
+    , { key = "solid", name = "Solid color" }
+    , { key = "northernLights", name = "Northern lights" }
+    ]
 
 
 
@@ -43,6 +59,8 @@ type HclParam
 
 type Msg
     = NoOp
+    | SendColors
+    | EffectChange String
     | HclChange HclParam String
 
 
@@ -64,7 +82,8 @@ zint s =
 colorObject : Model -> Json.Encode.Value
 colorObject m =
     Json.Encode.object
-        [ ( "hue", Json.Encode.int m.hue )
+        [ ( "effect", Json.Encode.string m.effect )
+        , ( "hue", Json.Encode.int m.hue )
         , ( "chroma", Json.Encode.int m.chroma )
         , ( "luminance", Json.Encode.int m.luminance )
         ]
@@ -79,13 +98,19 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HclChange Hue s ->
-            ( { model | hue = zint s }, sendColors model )
+            update SendColors { model | hue = zint s }
 
         HclChange Chroma s ->
-            ( { model | chroma = zint s }, sendColors model )
+            update SendColors { model | chroma = zint s }
 
         HclChange Luminance s ->
-            ( { model | luminance = zint s }, sendColors model )
+            update SendColors { model | luminance = zint s }
+
+        EffectChange s ->
+            update SendColors { model | effect = s }
+
+        SendColors ->
+            ( model, sendColors model )
 
         NoOp ->
             ( model, Cmd.none )
@@ -93,6 +118,19 @@ update msg model =
 
 
 ---- VIEW ----
+
+
+effectDropdownOption : Effect -> Html Msg
+effectDropdownOption effect =
+    option [ value effect.key ] [ text effect.name ]
+
+
+effectDropdown : List Effect -> Html Msg
+effectDropdown effects =
+    div []
+        [ h2 [] [ text "Effect" ]
+        , select [ onInput EffectChange ] (List.map effectDropdownOption effects)
+        ]
 
 
 slider : String -> HclParam -> ColorValue -> Html Msg
@@ -115,6 +153,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Any Colour You Like" ]
+        , effectDropdown effects
         , div [ class "sliders" ]
             [ slider "Hue" Hue model.hue
             , slider "Chroma" Chroma model.chroma
