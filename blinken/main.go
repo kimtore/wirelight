@@ -132,7 +132,7 @@ func main() {
 	}
 
 	// Set up Websockets server
-	wsMessages := make(chan ws.Message, 1024)
+	wsMessages := make(chan ws.State, 1024)
 	go ws.Serve("0.0.0.0:8011", "/", wsMessages)
 
 	// Set up signal handler

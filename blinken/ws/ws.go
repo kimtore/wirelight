@@ -10,7 +10,7 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
-type Message struct {
+type State struct {
 	Effect    string
 	Hue       uint16
 	Chroma    uint16
@@ -27,7 +27,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     checkOrigin,
 }
 
-func MakeColor(m Message) colorful.Color {
+func MakeColor(m State) colorful.Color {
 	return colorful.Hcl(
 		float64(m.Hue)/65535.0*360,
 		float64(m.Chroma)/65535.0,
@@ -35,14 +35,18 @@ func MakeColor(m Message) colorful.Color {
 	)
 }
 
-func Serve(addr, path string, messages chan Message) {
+func Serve(addr, path string, messages chan State) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+
+		// Upgrade the connection to a websocket connection.
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
+		// Send the initial server state.
+		// FIXME
 		err = conn.WriteMessage(websocket.TextMessage, []byte("foobar"))
 		if err != nil {
 			log.Printf("while sending initial message: %s\n", err)
@@ -50,17 +54,22 @@ func Serve(addr, path string, messages chan Message) {
 		}
 
 		for {
+			// Receive websocket payload.
 			_, payload, err := conn.ReadMessage()
 			if err != nil {
 				log.Println(err)
 				return
 			}
-			m := Message{}
+
+			// Decode JSON.
+			m := State{}
 			err = json.Unmarshal(payload, &m)
 			if err != nil {
 				log.Printf("while unmarshalling: %s\n", err)
 				return
 			}
+
+			// Pass message on to the effect engine.
 			messages <- m
 		}
 	})
