@@ -155,13 +155,15 @@ func main() {
 		select {
 		case msg := <-mqttMessages:
 			command, err := mqttlight.Unmarshal(msg)
-			fmt.Printf("%+v\n", command)
+			//fmt.Printf("%+v\n", command)
 			if err != nil {
 				fmt.Printf("while decoding JSON message: %s\n", err)
 				continue
 			}
 			if command.On() {
-				newColor := command.TransformColor(oldColor)
+				newColor := command.TransformColor(oldColor).Clamped()
+				h, c, l := newColor.Hcl()
+				fmt.Printf("%.2f %.2f %.2f\n", h, c, l)
 				effect.Fill(canvas, newColor)
 				oldColor = newColor
 			} else {

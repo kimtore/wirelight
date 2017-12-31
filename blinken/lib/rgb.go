@@ -30,3 +30,21 @@ func MakeColor(c color.Color) colorful.Color {
 func Rad(d float64) float64 {
 	return d * x
 }
+
+// MiredToKelvin converts a Mired color to Kelvin degrees.
+// Home Assistant sends values between 156-500, which correspond to a range of
+// approximately 2000-6500 kelvins.
+func MiredToKelvin(mired uint16) uint16 {
+	x := 1000000 / int(mired)
+	return uint16(x)
+}
+
+func ColorTemperature(kelvin uint16, luminance float64) colorful.Color {
+	var coords xy
+	var ok bool
+	baseTemperature := int(math.Floor(float64(kelvin)/100) * 100)
+	if coords, ok = colorTemperature[baseTemperature]; !ok {
+		coords = colorTemperature[6500]
+	}
+	return colorful.Xyy(coords[0], coords[1], luminance)
+}

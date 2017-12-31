@@ -25,7 +25,7 @@ const (
 // Command holds the message from the Home-Assistant
 type Command struct {
 	Brightness uint8
-	Color_temp int
+	Color_temp uint16
 	Color      struct {
 		R uint8
 		G uint8
@@ -75,6 +75,9 @@ func (c Command) TransformColor(existing colorful.Color) colorful.Color {
 	switch c.Type() {
 	case RGB:
 		return lib.MakeColor(color.RGBA{c.Color.R, c.Color.G, c.Color.B, 0})
+	case Temperature:
+		kelvin := lib.MiredToKelvin(c.Color_temp)
+		return lib.ColorTemperature(kelvin, 1.0)
 	}
 	return existing
 }

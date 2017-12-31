@@ -10,7 +10,7 @@ func init() {
 	Effects["off"] = Effect{
 		Name:     "Darkness",
 		Function: off,
-		Delay:    1 * time.Second,
+		Delay:    10000 * time.Hour,
 		Palette:  Palette{},
 	}
 }
