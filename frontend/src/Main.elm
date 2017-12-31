@@ -46,6 +46,7 @@ effects =
     [ { key = "off", name = "Darkness" }
     , { key = "solid", name = "Solid color" }
     , { key = "northernLights", name = "Northern lights" }
+    , { key = "wave", name = "Wave" }
     ]
 
 
