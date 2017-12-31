@@ -14,7 +14,7 @@ func init() {
 	Effects["wave"] = Effect{
 		Name:     "Wave",
 		Function: wave,
-		Delay:    18000 * time.Microsecond,
+		Delay:    180 * time.Microsecond,
 		Palette: Palette{
 			"default": colorful.Hcl(0, 0, 0),
 		},
@@ -22,16 +22,16 @@ func init() {
 }
 
 func wave(e Effect) Effect {
-	h, s, v := e.Palette["default"].Clamped().Hsv()
+	h, c, l := e.Palette["default"].Hcl()
 	bounds := e.Canvas.Bounds()
 	xmax := float64(bounds.Max.X)
 	xstep := 180.0 / xmax
 
 	FillFunc(e.Canvas, func(x, y int, col colorful.Color) colorful.Color {
 		lumAngle := waveSine + (float64(x) * xstep)
-		sin := math.Abs(math.Sin(lib.Rad(lumAngle)))
-		val := v - (sin * 4)
-		return colorful.Hsv(h, s, val)
+		sin := (1 + math.Sin(lib.Rad(lumAngle))) / 4
+		val := l + sin
+		return colorful.Hcl(h, c, val)
 	})
 
 	waveSine += 0.1
