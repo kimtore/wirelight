@@ -14,7 +14,7 @@ func init() {
 	Effects["wave"] = Effect{
 		Name:     "Wave",
 		Function: wave,
-		Delay:    180 * time.Microsecond,
+		Delay:    400 * time.Microsecond,
 		Palette: Palette{
 			"default": colorful.Hcl(0, 0, 0),
 		},
@@ -22,16 +22,15 @@ func init() {
 }
 
 func wave(e Effect) Effect {
-	h, c, l := e.Palette["default"].Hcl()
+	h, s, v := e.Palette["default"].Hsv()
 	bounds := e.Canvas.Bounds()
-	xmax := float64(bounds.Max.X)
-	xstep := 180.0 / xmax
+	xstep := 180.0 / float64(bounds.Max.X) // wave length equals one strip length
 
 	FillFunc(e.Canvas, func(x, y int, col colorful.Color) colorful.Color {
 		lumAngle := waveSine + (float64(x) * xstep)
 		sin := (1 + math.Sin(lib.Rad(lumAngle))) / 4
-		val := l + sin
-		return colorful.Hcl(h, c, val)
+		val := v + sin
+		return colorful.Hsv(h, s, val)
 	})
 
 	waveSine += 0.1
