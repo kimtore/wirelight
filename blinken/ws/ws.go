@@ -11,10 +11,10 @@ import (
 )
 
 type State struct {
-	Effect    string
-	Hue       uint16
-	Chroma    uint16
-	Luminance uint16
+	Effect string
+	H      uint16
+	S      uint16
+	V      uint16
 }
 
 func checkOrigin(r *http.Request) bool {
@@ -28,10 +28,10 @@ var upgrader = websocket.Upgrader{
 }
 
 func MakeColor(m State) colorful.Color {
-	return colorful.Hcl(
-		float64(m.Hue)/65535.0*360,
-		float64(m.Chroma)/65535.0,
-		float64(m.Luminance)/65535.0,
+	return colorful.Hsv(
+		float64(m.H)/65535.0*360,
+		float64(m.S)/65535.0,
+		float64(m.V)/65535.0,
 	)
 }
 

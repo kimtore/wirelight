@@ -19,8 +19,8 @@ type alias Effect =
 type alias Model =
     { effect : String
     , hue : ColorValue
-    , chroma : ColorValue
-    , luminance : ColorValue
+    , saturation : ColorValue
+    , brightness : ColorValue
     , serverState : String
     }
 
@@ -33,8 +33,8 @@ init : ( Model, Cmd Msg )
 init =
     ( { effect = "off"
       , hue = 0
-      , chroma = 0
-      , luminance = 0
+      , saturation = 0
+      , brightness = 0
       , serverState = ""
       }
     , Cmd.none
@@ -56,8 +56,8 @@ effects =
 
 type HclParam
     = Hue
-    | Chroma
-    | Luminance
+    | Saturation
+    | Brightness
 
 
 type Msg
@@ -87,9 +87,9 @@ colorObject : Model -> Json.Encode.Value
 colorObject m =
     Json.Encode.object
         [ ( "effect", Json.Encode.string m.effect )
-        , ( "hue", Json.Encode.int m.hue )
-        , ( "chroma", Json.Encode.int m.chroma )
-        , ( "luminance", Json.Encode.int m.luminance )
+        , ( "h", Json.Encode.int m.hue )
+        , ( "s", Json.Encode.int m.saturation )
+        , ( "v", Json.Encode.int m.brightness )
         ]
 
 
@@ -104,11 +104,11 @@ update msg model =
         HclChange Hue s ->
             update SendColors { model | hue = zint s }
 
-        HclChange Chroma s ->
-            update SendColors { model | chroma = zint s }
+        HclChange Saturation s ->
+            update SendColors { model | saturation = zint s }
 
-        HclChange Luminance s ->
-            update SendColors { model | luminance = zint s }
+        HclChange Brightness s ->
+            update SendColors { model | brightness = zint s }
 
         EffectChange s ->
             update SendColors { model | effect = s }
@@ -163,8 +163,8 @@ view model =
         , effectDropdown effects
         , div [ class "sliders" ]
             [ slider "Hue" Hue model.hue
-            , slider "Chroma" Chroma model.chroma
-            , slider "Luminance" Luminance model.luminance
+            , slider "Saturation" Saturation model.saturation
+            , slider "Brightness" Brightness model.brightness
             ]
         ]
 
