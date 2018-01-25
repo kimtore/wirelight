@@ -9,20 +9,20 @@ import (
 )
 
 // Which kind of JSON message was sent.
-type CommandType int
+type StateType int
 
 const (
-	Unknown CommandType = iota
-	Brightness
-	Effect
-	RGB
-	State
-	Temperature
-	White
+	Unknown StateType = iota
+	BrightnessChanged
+	EffectChanged
+	RGBChanged
+	StateChanged
+	TemperatureChanged
+	WhiteValueChanged
 )
 
-// Command holds the message from the Home-Assistant
-type Command struct {
+// State holds the message from the Home-Assistant
+type State struct {
 	Brightness uint8
 	Color_temp uint16
 	Color      struct {
@@ -37,44 +37,44 @@ type Command struct {
 }
 
 // Unmarshal converts a JSON payload into a command structure.
-func Unmarshal(cmd []byte) (Command, error) {
-	c := Command{}
+func Unmarshal(cmd []byte) (State, error) {
+	c := State{}
 	err := json.Unmarshal(cmd, &c)
 	return c, err
 }
 
 // Type returns the update command type, based on which fields were set during
 // JSON unmarshalling.
-func (c Command) Type() CommandType {
+func (c State) Type() StateType {
 	if c.Brightness > 0 {
-		return Brightness
+		return BrightnessChanged
 	}
 	// TODO: effect
 	if c.Color_temp > 0 {
-		return Temperature
+		return TemperatureChanged
 	}
 	if c.Color.R > 0 || c.Color.G > 0 || c.Color.B > 0 {
-		return RGB
+		return RGBChanged
 	}
 	if c.White_value > 0 {
-		return White
+		return WhiteValueChanged
 	}
 	if len(c.State) > 0 {
-		return State
+		return StateChanged
 	}
 	return Unknown
 }
 
-func (c Command) On() bool {
+func (c State) On() bool {
 	return c.State == "ON"
 
 }
 
-func (c Command) TransformColor(existing colorful.Color) colorful.Color {
+func (c State) TransformColor(existing colorful.Color) colorful.Color {
 	switch c.Type() {
-	case RGB:
+	case RGBChanged:
 		return lib.LinearRGB(c.Color.R, c.Color.G, c.Color.B)
-	case Temperature:
+	case TemperatureChanged:
 		kelvin := lib.MiredToKelvin(c.Color_temp)
 		return lib.ColorTemperature(kelvin, 1.0)
 	}
