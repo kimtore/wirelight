@@ -19,6 +19,12 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
+type State struct {
+	Color         colorful.Color
+	MqttState     mqttlight.State
+	FrontendState ws.State
+}
+
 const CLIENT_ID string = "blinken"
 
 var (
@@ -87,12 +93,6 @@ func main() {
 
 	// Set up the LED strip writer.
 	strip := ledclient.NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
-	/*
-		rect := image.Rectangle{
-			Min: image.Point{0, 0},
-			Max: image.Point{*rows, *cols},
-		}
-	*/
 	canvas := ledclient.NewCanvas(*rows, *cols)
 	defer strip.Close()
 
@@ -116,44 +116,45 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
-	// Cache the last used color.
-	oldColor := colorful.Color{}
+	// Set up program state
+	state := State{}
 
 	// termination
-	var ef effect.Effect
 	terminate := make(chan int, 1)
 
-	// Default effect is to switch off the lights.
-	ef = effect.Effects["off"]
-	go effect.Run(ef, terminate, canvas)
+	switchEffect := func(e effect.Effect) {
+		terminate <- 1
+		go effect.Run(e, terminate, canvas)
+	}
 
-	// Loop through MQTT messages.
+	// Default effect is to switch off the lights.
+	go effect.Run(effect.Effects["off"], terminate, canvas)
+
+	// Loop through messages from the MQTT server and the frontend.
 	for {
 		select {
 		case msg := <-mqttMessages:
 			command, err := mqttlight.Unmarshal(msg)
-			//fmt.Printf("%+v\n", command)
 			if err != nil {
-				fmt.Printf("while decoding JSON message: %s\n", err)
+				fmt.Printf("while decoding MQTT JSON message: %s\n", err)
 				continue
 			}
+			state.MqttState = command
+			ef := effect.Effects["solid"]
 			if command.On() {
-				newColor := command.TransformColor(oldColor).Clamped()
-				h, c, l := newColor.Hcl()
-				fmt.Printf("%.2f %.2f %.2f\n", h, c, l)
-				effect.Fill(canvas, newColor)
-				oldColor = newColor
+				state.Color = command.TransformColor(state.Color)
+				ef.Palette["default"] = state.Color
 			} else {
-				effect.Fill(canvas, colorful.Color{})
+				ef.Palette["default"] = colorful.LinearRgb(0, 0, 0)
 			}
-			//fmt.Printf("This is a message of type %+v.\n", command.Type())
+			switchEffect(ef)
 
 		case msg := <-wsMessages:
-			terminate <- 1
-			ef = effect.Effects[msg.Effect]
+			state.FrontendState = msg
+			ef := effect.Effects[msg.Effect]
 			c := ws.MakeColor(msg)
 			ef.Palette["default"] = c
-			go effect.Run(ef, terminate, canvas)
+			switchEffect(ef)
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")
