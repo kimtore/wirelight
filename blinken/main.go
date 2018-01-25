@@ -10,15 +10,14 @@ import (
 	"image"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/ambientsound/wirelight/blinken/effect"
+	"github.com/ambientsound/wirelight/blinken/ledclient"
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	"github.com/ambientsound/wirelight/blinken/ws"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
-	"github.com/pebbe/zmq4"
 )
 
 const CLIENT_ID string = "blinken"
@@ -36,29 +35,6 @@ var (
 
 func init() {
 	flag.Parse()
-}
-
-func cycleTime(freq int) time.Duration {
-	return (1 * time.Second) / time.Duration(freq)
-}
-
-func zmqSocket(address string) (*zmq4.Socket, error) {
-	ctx, err := zmq4.NewContext()
-	if err != nil {
-		return nil, fmt.Errorf("while creating ZeroMQ context: %s\n", err)
-	}
-
-	sock, err := ctx.NewSocket(zmq4.PUB)
-	if err != nil {
-		return nil, fmt.Errorf("while creating ZeroMQ socket: %s\n", err)
-	}
-
-	err = sock.Connect(address)
-	if err != nil {
-		return nil, fmt.Errorf("while connecting to %s: %s\n", address, err)
-	}
-
-	return sock, nil
 }
 
 func mqttClient(address, username, password, topic string, messages chan []byte) (MQTT.Client, error) {
@@ -103,7 +79,7 @@ func mqttClient(address, username, password, topic string, messages chan []byte)
 
 func main() {
 	// Set up ZeroMQ connection to LEDServer.
-	sock, err := zmqSocket(*ledServerAddress)
+	sock, err := ledclient.Socket(*ledServerAddress)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
@@ -111,7 +87,7 @@ func main() {
 	defer sock.Close()
 
 	// Set up the LED strip writer.
-	strip := NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
+	strip := ledclient.NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
 	rect := image.Rectangle{
 		Min: image.Point{0, 0},
 		Max: image.Point{*rows, *cols},

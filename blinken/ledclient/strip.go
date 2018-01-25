@@ -1,4 +1,4 @@
-package main
+package ledclient
 
 import (
 	"fmt"
@@ -51,6 +51,10 @@ func (s *Strip) rpcLED(led *pb.LED) error {
 	}
 
 	return nil
+}
+
+func cycleTime(freq int) time.Duration {
+	return (1 * time.Second) / time.Duration(freq)
 }
 
 // Index returns the physical position of a single LED.
