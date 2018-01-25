@@ -3,7 +3,6 @@ package mqttlight
 
 import (
 	"encoding/json"
-	"image/color"
 
 	"github.com/ambientsound/wirelight/blinken/lib"
 	colorful "github.com/lucasb-eyer/go-colorful"
@@ -74,7 +73,7 @@ func (c Command) On() bool {
 func (c Command) TransformColor(existing colorful.Color) colorful.Color {
 	switch c.Type() {
 	case RGB:
-		return lib.MakeColor(color.RGBA{c.Color.R, c.Color.G, c.Color.B, 0})
+		return lib.LinearRGB(c.Color.R, c.Color.G, c.Color.B)
 	case Temperature:
 		kelvin := lib.MiredToKelvin(c.Color_temp)
 		return lib.ColorTemperature(kelvin, 1.0)

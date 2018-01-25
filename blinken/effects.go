@@ -1,23 +1,12 @@
 package main
 
-import (
-	"fmt"
-	"image"
-	"math"
-	"math/rand"
-	"time"
-
-	"github.com/ambientsound/wirelight/blinken/effect"
-	"github.com/ambientsound/wirelight/blinken/lib"
-	colorful "github.com/lucasb-eyer/go-colorful"
-)
-
-func emergency(canvas *image.RGBA) {
+/*
+func emergency(canvas *ledclient.Canvas) {
 	blue := colorful.LinearRgb(0, 0, 1.0).Clamped()
 	black := colorful.Hcl(0, 0, 0).Clamped()
 	_ = black
-	b := canvas.Bounds()
-	half := b.Max.Y / 2
+	_, height := canvas.Size()
+	half := height / 2
 	offset := 0
 
 	for {
@@ -46,13 +35,13 @@ func emergency(canvas *image.RGBA) {
 	}
 }
 
-func northernLights(canvas *image.RGBA) {
-	b := canvas.Bounds()
+func northernLights(canvas *ledclient.Canvas) {
+	width, height := canvas.Size()
 	old := make([]colorful.Color, b.Max.X*b.Max.Y)
 	for {
 		for angle := 0.0; angle < 360.0; angle++ {
-			for x := b.Min.X; x < b.Max.X; x++ {
-				for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := 0; x < width; x++ {
+				for y := 0; y < height; y++ {
 					i := (y * b.Max.X) + x
 					col := colorful.Hsl(angle+rand.Float64()*50.0, 1, rand.Float64()*0.1)
 					step := col.BlendHcl(old[i], 0.92).Clamped()
@@ -65,7 +54,7 @@ func northernLights(canvas *image.RGBA) {
 	}
 }
 
-func northernLightsStable(canvas *image.RGBA) {
+func northernLightsStable(canvas *ledclient.Canvas) {
 	angle := 80.0
 	angle = 180.0
 	def := colorful.Hcl(angle, 1.0, 0.05)
@@ -82,15 +71,15 @@ func northernLightsStable(canvas *image.RGBA) {
 	}
 }
 
-func black(canvas *image.RGBA) {
+func black(canvas *ledclient.Canvas) {
 	effect.Fill(canvas, colorful.Hsv(0, 0, 0))
 }
 
-func white(canvas *image.RGBA) {
+func white(canvas *ledclient.Canvas) {
 	effect.Fill(canvas, colorful.Hsv(0, 0, 1.0))
 }
 
-func snake(canvas *image.RGBA) {
+func snake(canvas *ledclient.Canvas) {
 	col := colorful.Hcl(0, 1, 0.1)
 	black(canvas)
 	b := canvas.Bounds()
@@ -104,7 +93,7 @@ func snake(canvas *image.RGBA) {
 	}
 }
 
-func blinkWhite(canvas *image.RGBA) {
+func blinkWhite(canvas *ledclient.Canvas) {
 	for {
 		effect.Fill(canvas, colorful.Hcl(0, 0, 1.0))
 		time.Sleep(time.Millisecond * 1000)
@@ -113,7 +102,7 @@ func blinkWhite(canvas *image.RGBA) {
 	}
 }
 
-func split(canvas *image.RGBA) {
+func split(canvas *ledclient.Canvas) {
 	l := 0.15
 	left := colorful.Hcl(30.0, 1.0, l).Clamped()
 	right := colorful.Hcl(180.0, 1.0, l).Clamped()
@@ -133,7 +122,7 @@ func split(canvas *image.RGBA) {
 	}
 }
 
-func fullBlue(canvas *image.RGBA) {
+func fullBlue(canvas *ledclient.Canvas) {
 	for {
 		col := colorful.Hcl(80, 1.0, 1.0)
 		effect.Fill(canvas, col)
@@ -141,7 +130,7 @@ func fullBlue(canvas *image.RGBA) {
 	}
 }
 
-func superGradients(canvas *image.RGBA) {
+func superGradients(canvas *ledclient.Canvas) {
 	for {
 		hue := rand.Float64() * 360.0
 		for deg := 0.0; deg <= 180.0; deg += 1 {
@@ -155,7 +144,7 @@ func superGradients(canvas *image.RGBA) {
 }
 
 // directionTest draws up a gradient on each strip.
-func directionTest(canvas *image.RGBA) {
+func directionTest(canvas *ledclient.Canvas) {
 	c := 1.0
 	l := 0.05
 
@@ -178,7 +167,7 @@ func directionTest(canvas *image.RGBA) {
 	}
 }
 
-func gradients(canvas *image.RGBA) {
+func gradients(canvas *ledclient.Canvas) {
 	var h, c, l float64
 	h = 0.0
 	c = 0.8
@@ -205,7 +194,7 @@ func gradients(canvas *image.RGBA) {
 	}
 }
 
-func staccatoWheel(canvas *image.RGBA) {
+func staccatoWheel(canvas *ledclient.Canvas) {
 	var h float64
 	for {
 		h += 31
@@ -218,7 +207,7 @@ func staccatoWheel(canvas *image.RGBA) {
 	}
 }
 
-func wheelHCL(canvas *image.RGBA) {
+func wheelHCL(canvas *ledclient.Canvas) {
 	var h float64
 	for {
 		h += 1
@@ -231,7 +220,7 @@ func wheelHCL(canvas *image.RGBA) {
 	}
 }
 
-func wheelHSV(canvas *image.RGBA) {
+func wheelHSV(canvas *ledclient.Canvas) {
 	var h float64
 	for {
 		h += 1
@@ -243,3 +232,4 @@ func wheelHSV(canvas *image.RGBA) {
 		time.Sleep(time.Millisecond * 50)
 	}
 }
+*/

@@ -2,7 +2,6 @@ package ledclient
 
 import (
 	"fmt"
-	"image"
 	"time"
 
 	"github.com/ambientsound/wirelight/blinken/lib"
@@ -77,13 +76,13 @@ func (s *Strip) Index(x, y int) uint32 {
 
 // BitBlit transfers image data from an object implementing the Image interface
 // to a remote LED server.
-func (s *Strip) BitBlit(img image.Image) error {
+func (s *Strip) BitBlit(img *Canvas) error {
 	led := &pb.LED{}
 	for y := 0; y < s.height; y++ {
 		for x := 0; x < s.width; x++ {
 			led.Index = s.Index(x, y)
 			c := img.At(x, y)
-			led.Rgb = lib.RGBA(c)
+			led.Rgb = lib.RGBA(c.Clamped())
 			err := s.rpcLED(led)
 			if err != nil {
 				return err
@@ -95,7 +94,7 @@ func (s *Strip) BitBlit(img image.Image) error {
 
 // Loop renders the LEDs periodically. This function never returns until
 // Close() is called, so be sure to call it in a goroutine.
-func (s *Strip) Loop(img image.Image, freq int) {
+func (s *Strip) Loop(img *Canvas, freq int) {
 	c := cycleTime(freq)
 	for {
 		select {

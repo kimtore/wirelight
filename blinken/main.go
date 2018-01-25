@@ -7,7 +7,6 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"image"
 	"os"
 	"os/signal"
 
@@ -88,11 +87,13 @@ func main() {
 
 	// Set up the LED strip writer.
 	strip := ledclient.NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
-	rect := image.Rectangle{
-		Min: image.Point{0, 0},
-		Max: image.Point{*rows, *cols},
-	}
-	canvas := image.NewRGBA(rect)
+	/*
+		rect := image.Rectangle{
+			Min: image.Point{0, 0},
+			Max: image.Point{*rows, *cols},
+		}
+	*/
+	canvas := ledclient.NewCanvas(*rows, *cols)
 	defer strip.Close()
 
 	// Send a continuous stream of LED updates through ZeroMQ.

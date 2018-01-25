@@ -23,8 +23,8 @@ func init() {
 
 func wave(e Effect) Effect {
 	h, s, v := e.Palette["default"].Hsv()
-	bounds := e.Canvas.Bounds()
-	xstep := 180.0 / float64(bounds.Max.X) // wave length equals one strip length
+	width, _ := e.Canvas.Size()
+	xstep := 180.0 / float64(width) // wave length equals one strip length
 
 	FillFunc(e.Canvas, func(x, y int, col colorful.Color) colorful.Color {
 		lumAngle := waveSine + (float64(x) * xstep)
