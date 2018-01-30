@@ -5,7 +5,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,7 +13,6 @@ import (
 	"github.com/ambientsound/wirelight/blinken/ledclient"
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	"github.com/ambientsound/wirelight/blinken/ws"
-	MQTT "github.com/eclipse/paho.mqtt.golang"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
 	"github.com/spf13/viper"
@@ -34,46 +32,6 @@ func init() {
 	viper.AddConfigPath("/etc/")
 	viper.AddConfigPath("$HOME/.blinken/")
 	viper.AddConfigPath(".")
-}
-
-func mqttClient(address, username, password, topic, clientId string, messages chan []byte) (MQTT.Client, error) {
-	flag.Parse()
-
-	connOpts := MQTT.
-		NewClientOptions().
-		AddBroker(address).
-		SetClientID(clientId).
-		SetCleanSession(true).
-		SetAutoReconnect(true)
-
-	if username != "" {
-		connOpts.SetUsername(username)
-		if password != "" {
-			connOpts.SetPassword(password)
-		}
-	}
-	//tlsConfig := &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
-	tlsConfig := &tls.Config{}
-	connOpts.SetTLSConfig(tlsConfig)
-
-	connOpts.OnConnect = func(c MQTT.Client) {
-		token := c.Subscribe(topic, byte(0), func(client MQTT.Client, message MQTT.Message) {
-			messages <- message.Payload()
-		})
-		token.Wait()
-		if token.Error() != nil {
-			panic(token.Error())
-		}
-	}
-
-	client := MQTT.NewClient(connOpts)
-	token := client.Connect()
-
-	if token.Wait() && token.Error() != nil {
-		return nil, token.Error()
-	}
-
-	return client, nil
 }
 
 func main() {
@@ -106,7 +64,7 @@ func main() {
 
 	// Set up MQTT client for MQTT JSON light support
 	mqttMessages := make(chan []byte, 1024)
-	_, err = mqttClient(
+	_, err = mqttlight.New(
 		viper.GetString("mqtt.address"),
 		viper.GetString("mqtt.username"),
 		viper.GetString("mqtt.password"),
