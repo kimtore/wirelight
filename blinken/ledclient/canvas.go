@@ -1,6 +1,8 @@
 package ledclient
 
-import colorful "github.com/lucasb-eyer/go-colorful"
+import (
+	colorful "github.com/lucasb-eyer/go-colorful"
+)
 
 // Canvas is an array of LEDs, powered by colorful colors.
 type Canvas struct {
@@ -17,16 +19,16 @@ func NewCanvas(width, height int) *Canvas {
 	}
 }
 
-func (c *Canvas) pixelIndex(x, y int) int {
-	return c.height*y + x
+func (c *Canvas) PixelIndex(x, y int) int {
+	return c.width*y + x
 }
 
 func (c *Canvas) Set(x, y int, col colorful.Color) {
-	c.pixels[c.pixelIndex(x, y)] = col
+	c.pixels[c.PixelIndex(x, y)] = col
 }
 
 func (c *Canvas) At(x, y int) colorful.Color {
-	return c.pixels[c.pixelIndex(x, y)]
+	return c.pixels[c.PixelIndex(x, y)]
 }
 
 func (c *Canvas) Size() (int, int) {

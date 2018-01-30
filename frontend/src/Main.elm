@@ -47,6 +47,7 @@ effects =
     , { key = "solid", name = "Solid color" }
     , { key = "northernLights", name = "Northern lights" }
     , { key = "wave", name = "Wave" }
+    , { key = "rainbow", name = "Rainbow" }
     ]
 
 

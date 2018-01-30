@@ -51,10 +51,10 @@ func main() {
 	defer sock.Close()
 
 	// Set up the LED strip writer.
-	rows := viper.GetInt("height")
-	cols := viper.GetInt("width")
-	strip := ledclient.NewStrip(sock, rows, cols, uint64(rows*cols))
-	canvas := ledclient.NewCanvas(rows, cols)
+	width := viper.GetInt("width")
+	height := viper.GetInt("height")
+	strip := ledclient.NewStrip(sock, width, height, uint64(width*height))
+	canvas := ledclient.NewCanvas(width, height)
 	defer strip.Close()
 
 	// Send a continuous stream of LED updates through ZeroMQ.
