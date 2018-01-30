@@ -1,0 +1,13 @@
+---
+
+mqtt:
+    address: tcp://127.0.0.1:1883
+    topic: any/topic
+    username: blinken
+    password: blinken
+    id: blinken
+ledserver:
+    address: tcp://127.0.0.1:1230
+    fps: 24
+width: 4
+height: 60

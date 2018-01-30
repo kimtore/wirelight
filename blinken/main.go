@@ -17,6 +17,7 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	colorful "github.com/lucasb-eyer/go-colorful"
 	flag "github.com/ogier/pflag"
+	"github.com/spf13/viper"
 )
 
 type State struct {
@@ -25,30 +26,23 @@ type State struct {
 	FrontendState ws.State
 }
 
-const CLIENT_ID string = "blinken"
-
-var (
-	ledServerAddress  = flag.String("ledserver", "tcp://blinkt:1230", "LEDServer address")
-	freq              = flag.Int("freq", 24, "Update frequency")
-	cols              = flag.Int("cols", 4, "Number of LED strips")
-	rows              = flag.Int("rows", 60, "Number of LEDs in one strip")
-	mqttServerAddress = flag.String("mqtt", "tcp://127.0.0.1:1883", "The full url of the MQTT server to connect to")
-	mqttTopic         = flag.String("topic", "powerlamp/set", "Topic to subscribe to")
-	mqttUsername      = flag.String("username", "", "A username to authenticate to the MQTT server")
-	mqttPassword      = flag.String("password", "", "Password to match username")
-)
-
 func init() {
 	flag.Parse()
+
+	viper.SetConfigName("blinken")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/etc/")
+	viper.AddConfigPath("$HOME/.blinken/")
+	viper.AddConfigPath(".")
 }
 
-func mqttClient(address, username, password, topic string, messages chan []byte) (MQTT.Client, error) {
+func mqttClient(address, username, password, topic, clientId string, messages chan []byte) (MQTT.Client, error) {
 	flag.Parse()
 
 	connOpts := MQTT.
 		NewClientOptions().
 		AddBroker(address).
-		SetClientID(CLIENT_ID).
+		SetClientID(clientId).
 		SetCleanSession(true).
 		SetAutoReconnect(true)
 
@@ -83,8 +77,15 @@ func mqttClient(address, username, password, topic string, messages chan []byte)
 }
 
 func main() {
+	err := viper.ReadInConfig()
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		os.Exit(1)
+	}
+
 	// Set up ZeroMQ connection to LEDServer.
-	sock, err := ledclient.Socket(*ledServerAddress)
+	ledserver := viper.GetString("ledserver.address")
+	sock, err := ledclient.Socket(ledserver)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
@@ -92,17 +93,27 @@ func main() {
 	defer sock.Close()
 
 	// Set up the LED strip writer.
-	strip := ledclient.NewStrip(sock, *rows, *cols, uint64((*rows)*(*cols)))
-	canvas := ledclient.NewCanvas(*rows, *cols)
+	rows := viper.GetInt("height")
+	cols := viper.GetInt("width")
+	strip := ledclient.NewStrip(sock, rows, cols, uint64(rows*cols))
+	canvas := ledclient.NewCanvas(rows, cols)
 	defer strip.Close()
 
 	// Send a continuous stream of LED updates through ZeroMQ.
-	fmt.Printf("Sending LED updates to %s.\n", *ledServerAddress)
-	go strip.Loop(canvas, *freq)
+	fps := viper.GetInt("ledserver.fps")
+	fmt.Printf("Streaming LED updates to %s with %d FPS.\n", ledserver, fps)
+	go strip.Loop(canvas, fps)
 
 	// Set up MQTT client for MQTT JSON light support
 	mqttMessages := make(chan []byte, 1024)
-	_, err = mqttClient(*mqttServerAddress, *mqttUsername, *mqttPassword, *mqttTopic, mqttMessages)
+	_, err = mqttClient(
+		viper.GetString("mqtt.address"),
+		viper.GetString("mqtt.username"),
+		viper.GetString("mqtt.password"),
+		viper.GetString("mqtt.topic"),
+		viper.GetString("mqtt.id"),
+		mqttMessages,
+	)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
