@@ -9,16 +9,14 @@ import (
 
 var Effects = make(map[string]Effect, 0)
 
-type Palette map[string]colorful.Color
+type Parameters struct {
+	Canvas *ledclient.Canvas
+	Color  colorful.Color
+}
 
-type Effect struct {
-	Name       string              // Human-readable name.
-	Function   func(Effect) Effect // Function that runs the effect.
-	Palette    Palette             // Collection of colors available to the effect.
-	Parameters map[string]float64  // Collection of parameters available to the effect.
-	Terminate  chan int            // Send an integer to this channel to stop the effect.
-	Canvas     *ledclient.Canvas   // Canvas to draw the effect on.
-	Delay      time.Duration       // Delay between each iteration.
+type Effect interface {
+	Draw(Parameters)
+	Delay() time.Duration
 }
 
 // FillFunc executes a callback function for every LED in the canvas. The
@@ -43,18 +41,23 @@ func Fill(canvas *ledclient.Canvas, col colorful.Color) {
 }
 
 // Run runs an effect forever.
-func Run(e Effect, terminate chan int, canvas *ledclient.Canvas) {
-	e.Terminate = terminate
-	e.Canvas = canvas
-
+func Run(effectName string, p Parameters, terminate chan int, canvas *ledclient.Canvas) {
 	timer := time.NewTimer(0)
+
+	e := Effects[effectName]
+
+	reset := func() {
+		p.Canvas = canvas
+		e.Draw(p)
+		timer = time.NewTimer(e.Delay())
+	}
+
 	for {
 		select {
-		case <-e.Terminate:
+		case <-terminate:
 			return
 		case <-timer.C:
-			e = e.Function(e)
-			timer = time.NewTimer(e.Delay)
+			reset()
 		}
 	}
 }

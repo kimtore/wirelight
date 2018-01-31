@@ -88,16 +88,17 @@ func main() {
 	// Set up program state
 	state := State{}
 
-	// termination
+	// Effect communication
 	terminate := make(chan int, 1)
+	var effectParams effect.Parameters
 
-	switchEffect := func(e effect.Effect) {
+	switchEffect := func(name string) {
 		terminate <- 1
-		go effect.Run(e, terminate, canvas)
+		go effect.Run(name, effectParams, terminate, canvas)
 	}
 
 	// Default effect is to switch off the lights.
-	go effect.Run(effect.Effects["off"], terminate, canvas)
+	go effect.Run("off", effectParams, terminate, canvas)
 
 	// Loop through messages from the MQTT server and the frontend.
 	for {
@@ -109,21 +110,19 @@ func main() {
 				continue
 			}
 			state.MqttState = command
-			ef := effect.Effects["solid"]
 			if command.On() {
 				state.Color = command.TransformColor(state.Color)
-				ef.Palette["default"] = state.Color
+				effectParams.Color = state.Color
 			} else {
-				ef.Palette["default"] = colorful.LinearRgb(0, 0, 0)
+				effectParams.Color = colorful.LinearRgb(0, 0, 0)
 			}
-			switchEffect(ef)
+			switchEffect("solid")
 
 		case msg := <-wsMessages:
 			state.FrontendState = msg
-			ef := effect.Effects[msg.Effect]
 			c := ws.MakeColor(msg)
-			ef.Palette["default"] = c
-			switchEffect(ef)
+			effectParams.Color = c
+			switchEffect(msg.Effect)
 
 		case <-c:
 			fmt.Printf("caught signal, exiting...\n")

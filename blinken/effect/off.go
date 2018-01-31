@@ -6,16 +6,16 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
+type off struct{}
+
 func init() {
-	Effects["off"] = Effect{
-		Name:     "Darkness",
-		Function: off,
-		Delay:    10000 * time.Hour,
-		Palette:  Palette{},
-	}
+	Effects["off"] = off{}
 }
 
-func off(e Effect) Effect {
-	Fill(e.Canvas, colorful.LinearRgb(0, 0, 0))
-	return e
+func (e off) Delay() time.Duration {
+	return 1 * time.Hour
+}
+
+func (e off) Draw(p Parameters) {
+	Fill(p.Canvas, colorful.LinearRgb(0, 0, 0))
 }

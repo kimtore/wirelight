@@ -8,18 +8,17 @@ import (
 
 var rainbowSine float64 = 0.0
 
+type rainbow struct{}
+
 func init() {
-	Effects["rainbow"] = Effect{
-		Name:     "Rainbow",
-		Function: rainbow,
-		Delay:    4000 * time.Microsecond,
-		Palette: Palette{
-			"default": colorful.Hcl(0, 0, 0),
-		},
-	}
+	Effects["rainbow"] = rainbow{}
 }
 
-func addUp(f, delta, max float64) float64 {
+func (e rainbow) Delay() time.Duration {
+	return 4000 * time.Microsecond
+}
+
+func (e rainbow) addUp(f, delta, max float64) float64 {
 	f += delta
 	for f >= max {
 		f -= max
@@ -27,14 +26,14 @@ func addUp(f, delta, max float64) float64 {
 	return f
 }
 
-func rainbow(e Effect) Effect {
-	h, s, v := e.Palette["default"].Hsv()
-	width, _ := e.Canvas.Size()
+func (e rainbow) Draw(p Parameters) {
+	h, s, v := p.Color.Hsv()
+	width, _ := p.Canvas.Size()
 	h += waveSine
 	hueStep := 140.0 / float64(width)
 
-	FillFunc(e.Canvas, func(x, y int, col colorful.Color) colorful.Color {
-		hue := addUp(h, float64(x)*hueStep, 360.0)
+	FillFunc(p.Canvas, func(x, y int, col colorful.Color) colorful.Color {
+		hue := e.addUp(h, float64(x)*hueStep, 360.0)
 		return colorful.Hsv(hue, s, v)
 	})
 
@@ -42,6 +41,4 @@ func rainbow(e Effect) Effect {
 	if waveSine >= 360.0 {
 		waveSine = 0
 	}
-
-	return e
 }
