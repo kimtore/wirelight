@@ -79,7 +79,7 @@ func main() {
 
 	// Set up Websockets server
 	wsMessages := make(chan ws.State, 1024)
-	go ws.Serve("0.0.0.0:8011", "/", wsMessages)
+	go ws.Serve(viper.GetString("websocket.bind"), "/", wsMessages)
 
 	// Set up signal handler
 	c := make(chan os.Signal, 1)
