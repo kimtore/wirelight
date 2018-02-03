@@ -10,12 +10,13 @@ import (
 var Effects = make(map[string]Effect, 0)
 
 type Parameters struct {
-	Canvas *ledclient.Canvas
+	Name   string
 	Color  colorful.Color
+	Adjust float64
 }
 
 type Effect interface {
-	Draw(Parameters)
+	Draw(*ledclient.Canvas, Parameters)
 	Delay() time.Duration
 }
 
@@ -41,14 +42,13 @@ func Fill(canvas *ledclient.Canvas, col colorful.Color) {
 }
 
 // Run runs an effect forever.
-func Run(effectName string, p Parameters, terminate chan int, canvas *ledclient.Canvas) {
+func Run(canvas *ledclient.Canvas, p Parameters, terminate chan int) {
 	timer := time.NewTimer(0)
 
-	e := Effects[effectName]
+	e := Effects[p.Name]
 
 	reset := func() {
-		p.Canvas = canvas
-		e.Draw(p)
+		e.Draw(canvas, p)
 		timer = time.NewTimer(e.Delay())
 	}
 

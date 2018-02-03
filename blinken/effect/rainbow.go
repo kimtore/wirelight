@@ -3,6 +3,7 @@ package effect
 import (
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/ledclient"
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
@@ -26,13 +27,13 @@ func (e rainbow) addUp(f, delta, max float64) float64 {
 	return f
 }
 
-func (e rainbow) Draw(p Parameters) {
+func (e rainbow) Draw(canvas *ledclient.Canvas, p Parameters) {
 	h, s, v := p.Color.Hsv()
-	width, _ := p.Canvas.Size()
+	width, _ := canvas.Size()
 	h += waveSine
 	hueStep := 140.0 / float64(width)
 
-	FillFunc(p.Canvas, func(x, y int, col colorful.Color) colorful.Color {
+	FillFunc(canvas, func(x, y int, col colorful.Color) colorful.Color {
 		hue := e.addUp(h, float64(x)*hueStep, 360.0)
 		return colorful.Hsv(hue, s, v)
 	})

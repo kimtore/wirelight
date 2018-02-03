@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/ledclient"
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
@@ -17,10 +18,10 @@ func (e northernLights) Delay() time.Duration {
 	return 10 * time.Millisecond
 }
 
-func (e northernLights) Draw(p Parameters) {
+func (e northernLights) Draw(canvas *ledclient.Canvas, p Parameters) {
 	h, c, l := p.Color.Hcl()
 	def := colorful.Hcl(h, c, l)
-	FillFunc(p.Canvas, func(x, y int, col colorful.Color) colorful.Color {
+	FillFunc(canvas, func(x, y int, col colorful.Color) colorful.Color {
 		if rand.Intn(100) != 0 {
 			return def.BlendRgb(col, 0.98)
 		}

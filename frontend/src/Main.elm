@@ -21,6 +21,7 @@ type alias Model =
     , hue : ColorValue
     , saturation : ColorValue
     , brightness : ColorValue
+    , adjust : ColorValue
     , serverState : String
     }
 
@@ -35,6 +36,7 @@ init =
       , hue = 0
       , saturation = 0
       , brightness = 0
+      , adjust = 0
       , serverState = ""
       }
     , Cmd.none
@@ -59,6 +61,7 @@ type HclParam
     = Hue
     | Saturation
     | Brightness
+    | Adjust
 
 
 type Msg
@@ -91,6 +94,7 @@ colorObject m =
         , ( "h", Json.Encode.int m.hue )
         , ( "s", Json.Encode.int m.saturation )
         , ( "v", Json.Encode.int m.brightness )
+        , ( "adjust", Json.Encode.int m.adjust )
         ]
 
 
@@ -110,6 +114,9 @@ update msg model =
 
         HclChange Brightness s ->
             update SendColors { model | brightness = zint s }
+
+        HclChange Adjust s ->
+            update SendColors { model | adjust = zint s }
 
         EffectChange s ->
             update SendColors { model | effect = s }
@@ -166,6 +173,7 @@ view model =
             [ slider "Hue" Hue model.hue
             , slider "Saturation" Saturation model.saturation
             , slider "Brightness" Brightness model.brightness
+            , slider "Adjust" Adjust model.adjust
             ]
         ]
 

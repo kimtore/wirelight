@@ -3,6 +3,7 @@ package effect
 import (
 	"time"
 
+	"github.com/ambientsound/wirelight/blinken/ledclient"
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
@@ -16,6 +17,6 @@ func (e off) Delay() time.Duration {
 	return 1 * time.Hour
 }
 
-func (e off) Draw(p Parameters) {
-	Fill(p.Canvas, colorful.LinearRgb(0, 0, 0))
+func (e off) Draw(canvas *ledclient.Canvas, p Parameters) {
+	Fill(canvas, colorful.LinearRgb(0, 0, 0))
 }

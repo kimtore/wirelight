@@ -15,6 +15,7 @@ type State struct {
 	H      uint16
 	S      uint16
 	V      uint16
+	Adjust uint16
 }
 
 func checkOrigin(r *http.Request) bool {
@@ -27,11 +28,15 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     checkOrigin,
 }
 
+func Scale(src uint16, max float64) float64 {
+	return (float64(src) / 65535.0) * max
+}
+
 func MakeColor(m State) colorful.Color {
 	return colorful.Hsv(
-		float64(m.H)/65535.0*360,
-		float64(m.S)/65535.0,
-		float64(m.V)/65535.0,
+		Scale(m.H, 359.99),
+		Scale(m.S, 1.0),
+		Scale(m.V, 1.0),
 	)
 }
 

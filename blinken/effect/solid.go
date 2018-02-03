@@ -2,6 +2,8 @@ package effect
 
 import (
 	"time"
+
+	"github.com/ambientsound/wirelight/blinken/ledclient"
 )
 
 type solid struct{}
@@ -14,6 +16,6 @@ func (e solid) Delay() time.Duration {
 	return 1 * time.Second
 }
 
-func (e solid) Draw(p Parameters) {
-	Fill(p.Canvas, p.Color)
+func (e solid) Draw(canvas *ledclient.Canvas, p Parameters) {
+	Fill(canvas, p.Color)
 }
