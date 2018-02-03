@@ -9,8 +9,6 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
-var waveSine float64 = 0.0
-
 type wave struct{}
 
 func init() {
@@ -25,6 +23,7 @@ func (e wave) Draw(canvas *ledclient.Canvas, p Parameters) {
 	h, s, v := p.Color.Hsv()
 	width, _ := canvas.Size()
 	xstep := 180.0 / float64(width) // wave length equals one strip length
+	waveSine := p.Angle - 180.0
 
 	FillFunc(canvas, func(x, y int, col colorful.Color) colorful.Color {
 		lumAngle := waveSine + (float64(x) * xstep)
@@ -32,9 +31,4 @@ func (e wave) Draw(canvas *ledclient.Canvas, p Parameters) {
 		val := v + sin
 		return colorful.Hsv(h, s, val)
 	})
-
-	waveSine += 0.1
-	if waveSine >= 180.0 {
-		waveSine = -waveSine
-	}
 }

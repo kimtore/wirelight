@@ -13,6 +13,7 @@ type Parameters struct {
 	Name   string
 	Color  colorful.Color
 	Adjust float64
+	Angle  float64
 }
 
 type Effect interface {
@@ -41,6 +42,14 @@ func Fill(canvas *ledclient.Canvas, col colorful.Color) {
 	})
 }
 
+func increment(source, incr, min, max float64) float64 {
+	source += incr
+	if source >= max {
+		return min
+	}
+	return source
+}
+
 // Run runs an effect forever.
 func Run(canvas *ledclient.Canvas, ch chan Parameters, terminate chan int) {
 	var effect Effect
@@ -63,5 +72,6 @@ func Run(canvas *ledclient.Canvas, ch chan Parameters, terminate chan int) {
 		case <-timer.C:
 			reset()
 		}
+		params.Angle = increment(params.Angle, 0.1, 0, 360)
 	}
 }
