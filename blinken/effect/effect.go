@@ -42,20 +42,24 @@ func Fill(canvas *ledclient.Canvas, col colorful.Color) {
 }
 
 // Run runs an effect forever.
-func Run(canvas *ledclient.Canvas, p Parameters, terminate chan int) {
-	timer := time.NewTimer(0)
+func Run(canvas *ledclient.Canvas, ch chan Parameters, terminate chan int) {
+	var effect Effect
+	var params Parameters
 
-	e := Effects[p.Name]
+	timer := time.NewTimer(1000)
 
 	reset := func() {
-		e.Draw(canvas, p)
-		timer = time.NewTimer(e.Delay())
+		effect.Draw(canvas, params)
+		timer = time.NewTimer(effect.Delay())
 	}
 
 	for {
 		select {
 		case <-terminate:
 			return
+		case params = <-ch:
+			effect = Effects[params.Name]
+			reset()
 		case <-timer.C:
 			reset()
 		}
