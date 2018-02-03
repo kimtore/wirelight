@@ -22,7 +22,7 @@ func (e northernLights) Draw(canvas *ledclient.Canvas, p Parameters) {
 	h, c, l := p.Color.Hcl()
 	def := colorful.Hcl(h, c, l)
 	FillFunc(canvas, func(x, y int, col colorful.Color) colorful.Color {
-		if rand.Intn(100) != 0 {
+		if p.Adjust < rand.Float64()*100 {
 			return def.BlendRgb(col, 0.98)
 		}
 		a := 180.0 * (1.0 / float64(rand.Intn(500)+1))
