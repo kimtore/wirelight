@@ -124,6 +124,7 @@ func main() {
 			c := ws.MakeColor(msg)
 			params.Name = msg.Effect
 			params.Color = c
+			params.Adjust = ws.Scale(msg.Adjust, 1)
 			effectPipeline <- params
 
 		case <-c:

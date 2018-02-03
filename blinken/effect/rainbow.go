@@ -29,7 +29,7 @@ func (e rainbow) Draw(canvas *ledclient.Canvas, p Parameters) {
 	h, s, v := p.Color.Hsv()
 	width, _ := canvas.Size()
 	h += p.Angle
-	hueStep := 140.0 / float64(width)
+	hueStep := scale(p.Adjust, 0, 1, 0, 1080) / float64(width)
 
 	FillFunc(canvas, func(x, y int, col colorful.Color) colorful.Color {
 		hue := e.addUp(h, float64(x)*hueStep, 360.0)

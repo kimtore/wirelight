@@ -42,6 +42,7 @@ func Fill(canvas *ledclient.Canvas, col colorful.Color) {
 	})
 }
 
+// Increment a float value, and wrap it around if it grows too big.
 func increment(source, incr, min, max float64) float64 {
 	source += incr
 	if source >= max {
@@ -50,14 +51,21 @@ func increment(source, incr, min, max float64) float64 {
 	return source
 }
 
+// Scale a float in a range to a different range.
+func scale(src, srcMin, srcMax, dstMin, dstMax float64) float64 {
+	return ((dstMax - dstMin) * (src - srcMin) / (srcMax - srcMin)) + dstMin
+}
+
 // Run runs an effect forever.
 func Run(canvas *ledclient.Canvas, ch chan Parameters, terminate chan int) {
 	var effect Effect
 	var params Parameters
 
+	angle := 0.0
 	timer := time.NewTimer(1000)
 
 	reset := func() {
+		params.Angle = angle
 		effect.Draw(canvas, params)
 		timer = time.NewTimer(effect.Delay())
 	}
@@ -72,6 +80,6 @@ func Run(canvas *ledclient.Canvas, ch chan Parameters, terminate chan int) {
 		case <-timer.C:
 			reset()
 		}
-		params.Angle = increment(params.Angle, 0.1, 0, 360)
+		angle = increment(angle, 0.1, 0, 360)
 	}
 }
