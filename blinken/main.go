@@ -14,7 +14,6 @@ import (
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	"github.com/ambientsound/wirelight/blinken/ws"
 	colorful "github.com/lucasb-eyer/go-colorful"
-	flag "github.com/ogier/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -25,8 +24,6 @@ type State struct {
 }
 
 func init() {
-	flag.Parse()
-
 	viper.SetConfigName("blinken")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/")
