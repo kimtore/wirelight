@@ -1,0 +1,14 @@
+-- hardware
+NUM_LEDS = 60
+BYTES_PER_LED = 3
+
+-- mqtt
+MQTT_USER = ""
+MQTT_PASSWORD = ""
+MQTT_TIMEOUT = 120
+MQTT_TOPIC = ""
+
+-- network
+WIFI_SSID = ""
+WIFI_PASSWORD = ""
+HOSTNAME = ""
