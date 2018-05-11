@@ -1,12 +1,17 @@
 -- initialize leds
 leds = ws2812.newBuffer(NUM_LEDS, BYTES_PER_LED)
-leds_color = string.char(20, 20, 20)
+leds_color = string.char(100, 100, 100)
+leds_brightness = 40
+default_effect = "rainbow"
 
 -- init mqtt client with logins, keepalive timer 120sec
 m = mqtt.Client(HOSTNAME, 120, MQTT_USER, MQTT_PASSWORD)
 
 -- system status cache
 system_status = {wifi="wait", mqtt="wait", comm="wait"}
+
+-- Create effect runner
+effect = tmr.create()
 
 function led_render()
     ws2812.write(leds)
@@ -30,20 +35,33 @@ end
 function led_effect_static()
     for led = 1, NUM_LEDS do
         leds:set(led, leds_color)
-        --leds:set(led, 0, 30, 0)
     end
+end
+
+local rainbow_offset = 0
+local increment = (256 / NUM_LEDS)
+function led_effect_rainbow()
+    angle = rainbow_offset
+    for led = 1, NUM_LEDS do
+        g, r, b = color_utils.hsv2grb(angle % 360, 210, leds_brightness)
+        leds:set(led, g, r, b)
+        angle = angle + increment
+    end
+    rainbow_offset = (rainbow_offset + 1) % 360
 end
 
 -- LED effect table
 led_effect = "status"
 led_effects = {
     status=led_effect_status,
-    static=led_effect_static
+    static=led_effect_static,
+    rainbow=led_effect_rainbow
 }
 
 function led_run_effect()
     led_effects[led_effect]()
     led_render()
+    effect:start()
 end
 
 function handle_wifi_connect()
@@ -77,13 +95,9 @@ end
 function handle_mqtt_connect(client)
 	print("mqtt: connected")
     system_status.mqtt = "ok"
-    led_effect = "static"
+    led_effect = default_effect
 	client:subscribe(MQTT_TOPIC, 0, function(client) print("mqtt: subscribed to topic") end)
 end
-
--- Create effect runner
-effect = tmr.create()
-effect:alarm(50, tmr.ALARM_AUTO, led_run_effect)
 
 function handle_mqtt_message(client, topic, data) 
     if data == nil then
@@ -100,6 +114,9 @@ function handle_mqtt_message(client, topic, data)
         else
             effect:start()
         end
+    end
+    if t.brightness ~= nil then
+        leds_brightness = t.brightness
     end
     if t.color ~= nil then
         leds_color = string.char(t.color.g, t.color.r, t.color.b)
@@ -120,6 +137,9 @@ function do_mqtt_connect()
 end
 
 m:on("message", handle_mqtt_message)
+
+-- start effect runner
+effect:alarm(10, tmr.ALARM_SEMI, led_run_effect)
 
 -- connect to network
 wifi_init()
