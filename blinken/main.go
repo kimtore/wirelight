@@ -27,6 +27,7 @@ func init() {
 	viper.SetConfigName("blinken")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/")
+	viper.AddConfigPath("/etc/blinken")
 	viper.AddConfigPath("$HOME/.blinken/")
 	viper.AddConfigPath(".")
 }
