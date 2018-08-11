@@ -8,6 +8,8 @@ import (
 	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
+var BLACK colorful.Color
+
 type State struct {
 	On    bool
 	Color colorful.Color
@@ -19,10 +21,18 @@ func (s State) Update(input string) (State, error) {
 		return s, nil
 	}
 	if c, err := hslstr2color(input); err == nil {
+		s.On = true
 		s.Color = c
 		return s, nil
 	}
 	return s, fmt.Errorf("got '%s', expected ON, OFF, or R,G,B", input)
+}
+
+func (s *State) SwitchedColor() colorful.Color {
+	if s.On {
+		return s.Color
+	}
+	return BLACK
 }
 
 func onoff(s string) (bool, error) {
