@@ -11,6 +11,7 @@ import (
 
 	"github.com/ambientsound/wirelight/blinken/effect"
 	"github.com/ambientsound/wirelight/blinken/ledclient"
+	"github.com/ambientsound/wirelight/blinken/mqttcolor"
 	"github.com/ambientsound/wirelight/blinken/mqttlight"
 	"github.com/ambientsound/wirelight/blinken/ws"
 	colorful "github.com/lucasb-eyer/go-colorful"
@@ -19,7 +20,7 @@ import (
 
 type State struct {
 	Color         colorful.Color
-	MqttState     mqttlight.State
+	MqttState     mqttcolor.State
 	FrontendState ws.State
 }
 
@@ -60,7 +61,7 @@ func main() {
 	fmt.Printf("Streaming LED updates to %s with %d FPS.\n", ledserver, fps)
 	go strip.Loop(canvas, fps)
 
-	// Set up MQTT client for MQTT JSON light support
+	// Set up MQTT client for OpenHAB light support
 	mqttMessages := make(chan []byte, 1024)
 	_, err = mqttlight.New(
 		viper.GetString("mqtt.address"),
@@ -101,19 +102,14 @@ func main() {
 	for {
 		select {
 		case msg := <-mqttMessages:
-			command, err := mqttlight.Unmarshal(msg)
+			strmsg := string(msg)
+			state.MqttState, err = state.MqttState.Update(strmsg)
 			if err != nil {
-				fmt.Printf("while decoding MQTT JSON message: %s\n", err)
+				fmt.Printf("Received wrong message: %s\n", err)
 				continue
 			}
-			state.MqttState = command
-			if command.On() {
-				state.Color = command.TransformColor(state.Color)
-				params.Color = state.Color
-			} else {
-				params.Color = colorful.LinearRgb(0, 0, 0)
-			}
 			params.Name = "solid"
+			params.Color = state.MqttState.SwitchedColor()
 			effectPipeline <- params
 
 		case msg := <-wsMessages:
