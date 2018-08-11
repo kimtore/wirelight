@@ -28,7 +28,7 @@ int ledstrip_init() {
     ledstring.channel[0].gpionum = GPIO_PIN;
     ledstring.channel[0].count = LED_COUNT;
     ledstring.channel[0].invert = 0;
-    ledstring.channel[0].brightness = MAX_BRIGHTNESS;
+    ledstring.channel[0].brightness = 80;
     ledstring.channel[0].strip_type = STRIP_TYPE;
     ledstring.channel[1].gpionum = 0;
     ledstring.channel[1].count = 0;
