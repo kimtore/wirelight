@@ -76,6 +76,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf(
+		"Connected to MQTT server %s on topic %s.\n",
+		viper.GetString("mqtt.address"),
+		viper.GetString("mqtt.topic"),
+	)
+
 	// Set up Websockets server
 	wsMessages := make(chan ws.State, 1024)
 	go ws.Serve(viper.GetString("websocket.bind"), "/", wsMessages)
