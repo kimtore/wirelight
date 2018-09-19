@@ -2,6 +2,7 @@ package mqttcolor
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -69,6 +70,10 @@ func hslstr2color(st string) (colorful.Color, error) {
 	return c, nil
 }
 
+func squareFraction(number float64) float64 {
+	return math.Ceil(number*number*0.5) / 10000.0
+}
+
 func hsl2float(h, s, l uint64) (float64, float64, float64) {
-	return float64(h), float64(s) / 100.0, float64(l) / 100.0
+	return float64(h), float64(s) / 100.0, squareFraction(float64(l))
 }

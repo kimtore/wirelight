@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	COLOR colorful.Color = colorful.Hsl(100, 0.5, 0.5)
+	COLOR colorful.Color = colorful.Hsl(100, 0.5, 0.125)
 )
 
 var mqttcolorTests = []struct {
