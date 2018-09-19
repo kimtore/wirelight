@@ -11,6 +11,7 @@
 #include "pb.pb-c.h"
 
 #define ADDRESS "tcp://0.0.0.0:1230"
+#define RENDER_NEEDS_UPDATE false
 
 static uint8_t running = 1;
 
@@ -70,7 +71,7 @@ int main() {
             continue;
         }
         updated += ledstrip_assign(led->index, led->rgb);
-        if (led->render && updated != 0) {
+        if (led->render && (!RENDER_NEEDS_UPDATE || updated != 0)) {
             ledstrip_render();
             updated = 0;
         }
