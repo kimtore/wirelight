@@ -11,7 +11,7 @@
 #include "pb.pb-c.h"
 
 #define ADDRESS "tcp://0.0.0.0:1230"
-#define RENDER_NEEDS_UPDATE false
+#define RENDER_NEEDS_UPDATE 0
 
 static uint8_t running = 1;
 
