@@ -109,13 +109,13 @@ func main() {
 		select {
 		case msg := <-mqttMessages:
 			strmsg := string(msg)
+			fmt.Printf("Received message: %s\n", strmsg)
 			state.MqttState, err = state.MqttState.Update(strmsg)
 			if err != nil {
-				fmt.Printf("Received wrong message: %s\n", err)
-				continue
+				params.Name = strmsg
+			} else {
+				params.Color = state.MqttState.SwitchedColor()
 			}
-			params.Name = "solid"
-			params.Color = state.MqttState.SwitchedColor()
 			effectPipeline <- params
 
 		case msg := <-wsMessages:
