@@ -4,26 +4,6 @@
 // Serial DEBUG mode on/off
 #undef DEBUG_SERIAL
 #undef DEBUG_ANIMATION
-#undef DEBUG_POTS
-
-// Analog input pins.
-//
-// .-------.
-// |  O O  |
-// | O O O |
-// '-------'
-//
-// The device has five potentiometer inputs. The top left is a switch with 10
-// different values, while the other four have a variable input between 0-1023.
-//
-// The switch defines how the LEDs behave. The top button adjusts the parameter
-// in the current mode. The bottom three potentiometers adjusts hue, saturation,
-// and value for all the LEDs.
-#define PIN_POT_TOP 1
-#define PIN_POT_LEFT 2
-#define PIN_POT_CENTER 3
-#define PIN_POT_RIGHT 4
-#define PIN_POT_SWITCH 5
 
 // Digital IO pins.
 #define PIN_LED 5
@@ -67,7 +47,7 @@ struct {
     uint8_t hue;
     uint8_t sat;
     uint8_t val;
-} pots;
+} settings;
 
 // Initial setup, called once on boot.
 void setup() {
@@ -77,26 +57,6 @@ void setup() {
 #endif
 }
 
-#ifdef DEBUG_POTS
-void debugPots() {
-    uint8_t i;
-    uint16_t analog;
-    char buf[128];
-    char *ptr = &buf[0];
-
-    ptr += sprintf(ptr, "adc(");
-    for (i=1; i<6; i++) {
-        analog = analogRead(i);
-        ptr += sprintf(ptr, "%d: %4d, ", i, analog);
-    }
-    ptr += sprintf(ptr, ") ");
-    ptr += sprintf(ptr, "pots(mode:%d, var:%3d, hue:%3d, sat:%3d, val:%3d)", pots.mode, pots.var, pots.hue, pots.sat, pots.val);
-
-    *ptr = '\0';
-    Serial.println(buf);
-}
-#endif
-
 // animate returns true if the animation should be stepped.
 uint8_t animate(uint8_t speed) {
     static uint32_t lastClock = 0;
@@ -105,7 +65,7 @@ uint8_t animate(uint8_t speed) {
     uint32_t expectedDelay;
 
     // Animations are disabled when speed is zero.
-    if (pots.var == 0) {
+    if (settings.var == 0) {
         return 0;
     }
 
@@ -126,12 +86,6 @@ uint8_t animation(uint8_t speed) {
     static uint8_t an = 0;
     an += animate(speed);
     return an;
-}
-
-// Read a value from an analog pin as a byte value between 0-255.
-uint8_t adc8(uint8_t pin) {
-    uint16_t analog = analogRead(pin);
-    return map(analog, 1023, 0, 0, 255);
 }
 
 // Return the switch position from 0-9.
@@ -161,7 +115,7 @@ void modeOff() {
 
 // Fill all LEDs with the same color. This mode does not have an additional parameter.
 void modeSolid() {
-    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, pots.val));
+    fill_solid(&leds[0], NUM_LEDS, CHSV(settings.hue, settings.sat, settings.val));
 }
 
 // Fill all LEDs with a solid color on the temperature scale. The color
@@ -171,10 +125,10 @@ void modeTemperature() {
     uint8_t hue;
 
     wave = sin8(animation(230));
-    hue = map8(wave, pots.hue, max(pots.var, pots.hue));
+    hue = map8(wave, settings.hue, max(settings.var, settings.hue));
 
     fill_solid(&leds[0], NUM_LEDS, HeatColor(hue));
-    FastLED.setBrightness(pots.val);
+    FastLED.setBrightness(settings.val);
 }
 
 // Draw a linear gradient between two colors. The additional parameter defines
@@ -182,8 +136,8 @@ void modeTemperature() {
 void modeGradient() {
     fill_gradient(
         &leds[0],
-        0,          CHSV(pots.hue, pots.sat, pots.val),
-        NUM_LEDS-1, CHSV(pots.var, pots.sat, pots.val)
+        0,          CHSV(settings.hue, settings.sat, settings.val),
+        NUM_LEDS-1, CHSV(settings.var, settings.sat, settings.val)
     );
 }
 
@@ -192,8 +146,8 @@ void modeGradient() {
 void modeRainbow() {
     uint8_t hue;
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
-        hue = ledAngle(led) + animation(pots.var) + pots.hue;
-        leds[led] = CHSV(hue, pots.sat, pots.val);
+        hue = ledAngle(led) + animation(settings.var) + settings.hue;
+        leds[led] = CHSV(hue, settings.sat, settings.val);
     }
 }
 
@@ -203,21 +157,21 @@ void modeBreathe() {
     uint8_t sine;
     uint8_t value;
 
-    sine = cubicwave8(animation(pots.var));
-    start = pots.val - 100;
-    if (start > pots.val) {
+    sine = cubicwave8(animation(settings.var));
+    start = settings.val - 100;
+    if (start > settings.val) {
         start = 0;
     }
-    value = map8(sine, start, pots.val);
+    value = map8(sine, start, settings.val);
 
 #ifdef DEBUG_ANIMATION
     char buf[128];
-    sprintf(buf, "sine:%4d  start:%4d  pot:%4d  value:%4d", sine, start, pots.val, value);
+    sprintf(buf, "sine:%4d  start:%4d  pot:%4d  value:%4d", sine, start, settings.val, value);
     Serial.println(buf);
     delay(20);
 #endif
 
-    fill_solid(&leds[0], NUM_LEDS, CHSV(pots.hue, pots.sat, value));
+    fill_solid(&leds[0], NUM_LEDS, CHSV(settings.hue, settings.sat, value));
 }
 
 // Fill all LEDs with a single color, animating between two hues in a cubic
@@ -229,13 +183,13 @@ void modeBreatheGradient() {
     uint8_t distance;
     uint8_t speed;
 
-    distance = pots.var - pots.hue;
+    distance = settings.var - settings.hue;
     speed = 255 - map8(distance, 15, 130);
 
     angle = cubicwave8(animation(speed));
-    hue = map8(angle, pots.hue, pots.var);
+    hue = map8(angle, settings.hue, settings.var);
 
-    fill_solid(&leds[0], NUM_LEDS, CHSV(hue, pots.sat, pots.val));
+    fill_solid(&leds[0], NUM_LEDS, CHSV(hue, settings.sat, settings.val));
 }
 
 // 1-N colored dots, weaving in and out of sync with each other. The variable
@@ -244,15 +198,15 @@ void modeBreatheGradient() {
 // This function is adapted from https://github.com/atuline/FastLED-Demos.
 void modeJuggle() {
     uint8_t led;
-    uint8_t hue = pots.hue;
-    uint8_t dots = map8(pots.var, 1, NUM_LEDS / 2);
+    uint8_t hue = settings.hue;
+    uint8_t dots = map8(settings.var, 1, NUM_LEDS / 2);
     uint8_t step = 256 / dots;
 
     fadeToBlackBy(leds, NUM_LEDS, 20);
 
     for(uint8_t dot = 0; dot < dots; dot++) {
         led = beatsin16(dot+6, 0, NUM_LEDS-1);
-        leds[led] |= CHSV(hue, pots.sat, pots.val);
+        leds[led] |= CHSV(hue, settings.sat, settings.val);
         hue += step;
     }
 }
@@ -261,12 +215,12 @@ void modeJuggle() {
 void modeEase() {
     uint8_t angle;
     uint8_t value;
-    uint8_t an = animation(pots.var);
+    uint8_t an = animation(settings.var);
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = map(led, 0, NUM_LEDS-1, 0, 255);
         value = ease8InOutCubic(sin8(angle + an));
-        value = map(value, 0, 255, 0, pots.val);
-        leds[led] = CHSV(pots.hue, pots.sat, value);
+        value = map(value, 0, 255, 0, settings.val);
+        leds[led] = CHSV(settings.hue, settings.sat, value);
     }
 }
 
@@ -276,29 +230,24 @@ void modeRainbowTrain() {
     uint8_t hue = 0;
     uint8_t angle;
     uint8_t value;
-    uint8_t an = animation(pots.var);
+    uint8_t an = animation(settings.var);
     for (uint8_t led = 0; led < NUM_LEDS; led++) {
         angle = map(led, 0, NUM_LEDS-1, 0, 255);
         value = ease8InOutCubic(sin8(angle + an));
-        hue = map8(value, 0, pots.hue);
-        value = map8(value, 0, pots.val);
-        leds[led] = CHSV(hue, pots.sat, value);
+        hue = map8(value, 0, settings.hue);
+        value = map8(value, 0, settings.val);
+        leds[led] = CHSV(hue, settings.sat, value);
     }
 }
 
 // Read all potentiometers, and run one iteration of the active mode.
 void loop() {
-#ifdef DEBUG_POTS
-    debugPots();
-    delay(100);
-#endif
+    settings.mode = switchPosition(0);
+    settings.var  = 0;
+    settings.hue  = 0;
+    settings.sat  = 0;
+    settings.val  = 0;
 
-    pots.mode = switchPosition(PIN_POT_SWITCH);
-    pots.var  = adc8(PIN_POT_TOP);
-    pots.hue  = adc8(PIN_POT_LEFT);
-    pots.sat  = adc8(PIN_POT_CENTER);
-    pots.val  = adc8(PIN_POT_RIGHT);
-
-    modes[pots.mode]();
+    modes[settings.mode]();
     FastLED.show();
 }
