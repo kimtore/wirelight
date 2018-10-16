@@ -1,15 +1,22 @@
+// Configuration
+#include "config.h"
+
 // Use the FastLED library.
+#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
+// Wifi
+#include <ESP8266WiFi.h>
+
 // Serial DEBUG mode on/off
-#undef DEBUG_SERIAL
+#define DEBUG_SERIAL
 #undef DEBUG_ANIMATION
 
 // Digital IO pins.
-#define PIN_LED 5
+#define PIN_LED 4
 
 // Number of LEDs in the strip.
-#define NUM_LEDS 30
+#define NUM_LEDS 60
 
 // This variable holds the LED color state.
 CRGB leds[NUM_LEDS];
@@ -52,9 +59,30 @@ struct {
 // Initial setup, called once on boot.
 void setup() {
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+
+    fill_solid(&leds[0], NUM_LEDS, HeatColor(170));
+    FastLED.setBrightness(100);
+    FastLED.show();
+
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
 #ifdef DEBUG_SERIAL
     Serial.begin(115200);
+    Serial.print("Connecting to WiFi...");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+
+    Serial.print("Connected, IP address: ");
+    Serial.println(WiFi.localIP());
+#else
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(100);
+    }
 #endif
+
 }
 
 // animate returns true if the animation should be stepped.
@@ -86,22 +114,6 @@ uint8_t animation(uint8_t speed) {
     static uint8_t an = 0;
     an += animate(speed);
     return an;
-}
-
-// Return the switch position from 0-9.
-uint8_t switchPosition(uint8_t pin) {
-    uint16_t analog = analogRead(pin);
-    // readings are 91, 128, 176, 235, 509, 605, 767, 695, 930, 958
-    if (analog < 120)   return 0;
-    if (analog < 170)   return 1;
-    if (analog < 230)   return 2;
-    if (analog < 500)   return 3;
-    if (analog < 600)   return 4;
-    if (analog < 690)   return 5;
-    if (analog < 760)   return 7;
-    if (analog < 920)   return 6;
-    if (analog < 950)   return 8;
-    return 9;
 }
 
 uint8_t ledAngle(uint8_t led) {
@@ -242,11 +254,11 @@ void modeRainbowTrain() {
 
 // Read all potentiometers, and run one iteration of the active mode.
 void loop() {
-    settings.mode = switchPosition(0);
-    settings.var  = 0;
+    settings.mode = 3;
+    settings.var  = 127;
     settings.hue  = 0;
-    settings.sat  = 0;
-    settings.val  = 0;
+    settings.sat  = 255;
+    settings.val  = 100;
 
     modes[settings.mode]();
     FastLED.show();
