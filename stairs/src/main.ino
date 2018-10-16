@@ -135,6 +135,42 @@ void mqtt_publish_state() {
     mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, true);
 }
 
+void mqtt_handle_brightness(const char *payload) {
+    state.brightness = atoi(payload);
+}
+
+void mqtt_handle_rgb(const char *payload) {
+    char rgbStr[16];
+    char *ptr;
+    CRGB color;
+
+    strncpy(rgbStr, payload, 15);
+
+    ptr = strtok(rgbStr, ",");
+    if (ptr == NULL) {
+        return;
+    }
+    color.r = atoi(ptr);
+
+    ptr = strtok(NULL, ",");
+    if (ptr == NULL) {
+        return;
+    }
+    color.g = atoi(ptr);
+
+    ptr = strtok(NULL, ",");
+    if (ptr == NULL) {
+        return;
+    }
+    color.b = atoi(ptr);
+
+    state.rgb = color;
+}
+
+void mqtt_handle_temperature(const char *payload) {
+    state.temperature = atoi(payload);
+}
+
 void mqtt_handle_effect(const char *payload) {
     if (!strcmp(payload, "solid")) {
         state.effectFunc = modeSolid;
@@ -171,6 +207,14 @@ void mqtt_callback(char* p_topic, byte* p_payload, unsigned int p_length) {
 
     if (!strcmp(p_topic, MQTT_LIGHT_COMMAND_TOPIC)) {
         mqtt_handle_command(payload);
+    } else if (!strcmp(p_topic, MQTT_BRIGHTNESS_COMMAND_TOPIC)) {
+        mqtt_handle_brightness(payload);
+    } else if (!strcmp(p_topic, MQTT_TEMPERATURE_COMMAND_TOPIC)) {
+        mqtt_handle_temperature(payload);
+    } else if (!strcmp(p_topic, MQTT_RGB_COMMAND_TOPIC)) {
+        mqtt_handle_rgb(payload);
+    } else if (!strcmp(p_topic, MQTT_EFFECT_COMMAND_TOPIC)) {
+        mqtt_handle_effect(payload);
     }
 
     mqtt_publish_state();
