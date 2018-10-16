@@ -46,9 +46,7 @@ struct {
     uint8_t temperature;
     void (*effectFunc)();
     char* effect;
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+    CRGB rgb;
 } state;
 
 // MQTT client handles
@@ -74,10 +72,6 @@ uint8_t animate(uint8_t speed) {
     return 0;
 }
 
-CRGB currentRGB() {
-    return CRGB(state.r, state.g, state.b);
-}
-
 // animation animates from 0-255.
 uint8_t animation(uint8_t speed) {
     static uint8_t an = 0;
@@ -96,7 +90,7 @@ void modeOff() {
 
 // Fill all LEDs with the same color. This mode does not have an additional parameter.
 void modeSolid() {
-    fill_solid(&leds[0], NUM_LEDS, currentRGB());
+    fill_solid(&leds[0], NUM_LEDS, state.rgb);
 }
 
 // Fill all LEDs with a solid color on the temperature scale.
@@ -114,12 +108,31 @@ void modeRainbow() {
     }
 }
 
+// Broadcast the current state
 void mqtt_publish_state() {
+    char buf[16];
+
+    // State
     if (state.on) {
         mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_ON, true);
     } else {
         mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_OFF, true);
     }
+
+    // Effect
+    mqtt_client.publish(MQTT_EFFECT_STATE_TOPIC, state.effect, true);
+
+    // RGB color
+    sprintf(buf, "%d,%d,%d", state.rgb.r, state.rgb.g, state.rgb.b);
+    mqtt_client.publish(MQTT_RGB_STATE_TOPIC, buf, true);
+
+    // Brightness
+    sprintf(buf, "%d", state.brightness);
+    mqtt_client.publish(MQTT_BRIGHTNESS_STATE_TOPIC, buf, true);
+
+    // Color temperature
+    sprintf(buf, "%d", state.temperature);
+    mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, true);
 }
 
 void mqtt_handle_effect(const char *payload) {
@@ -169,6 +182,8 @@ void mqtt_connect() {
         Serial.println("INFO: connected");
         mqtt_publish_state();
         mqtt_client.subscribe(MQTT_LIGHT_COMMAND_TOPIC);
+        mqtt_client.subscribe(MQTT_BRIGHTNESS_COMMAND_TOPIC);
+        mqtt_client.subscribe(MQTT_RGB_COMMAND_TOPIC);
     } else {
         Serial.print("ERROR: failed, rc=");
         Serial.print(mqtt_client.state());
