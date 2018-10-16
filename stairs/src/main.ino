@@ -5,12 +5,16 @@
 #define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
-// Wifi
+// Wifi and MQTT
 #include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 
 // Serial DEBUG mode on/off
 #define DEBUG_SERIAL
 #undef DEBUG_ANIMATION
+
+#define LIGHT_ON "ON"
+#define LIGHT_OFF "OFF"
 
 // Digital IO pins.
 #define PIN_LED 4
@@ -49,6 +53,16 @@ void (*modes[MAX_MODES])() = {
 };
 
 struct {
+    bool on;
+    uint8_t brightness;
+    uint8_t temperature;
+    char* effect;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} state;
+
+struct {
     uint8_t mode;
     uint8_t var;
     uint8_t hue;
@@ -56,33 +70,52 @@ struct {
     uint8_t val;
 } settings;
 
+// MQTT client handles
+WiFiClient wifi_client;
+PubSubClient mqtt_client(wifi_client);
+
+// function called when a MQTT message arrived
+void mqtt_callback(char* p_topic, byte* p_payload, unsigned int p_length) {
+    char msg[512];
+    char payload[256];
+
+    memcpy(payload, p_payload, 256);
+    payload[p_length] = '\0';
+
+    sprintf(msg, "Topic '%s' received payload: '%s'", p_topic, payload);
+    Serial.println(msg);
+
+    if (!strcmp(payload, LIGHT_ON)) {
+        state.on = true;
+    } else {
+        state.on = false;
+    }
+}
+
+
 // Initial setup, called once on boot.
 void setup() {
+    Serial.begin(115200);
+
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+
+    memset(&state, sizeof state, 0);
 
     fill_solid(&leds[0], NUM_LEDS, HeatColor(170));
     FastLED.setBrightness(100);
     FastLED.show();
 
+    settings.mode = 3;
+    settings.var  = 127;
+    settings.hue  = 0;
+    settings.sat  = 255;
+    settings.val  = 127;
+
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-#ifdef DEBUG_SERIAL
-    Serial.begin(115200);
-    Serial.print("Connecting to WiFi...");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println();
-
-    Serial.print("Connected, IP address: ");
-    Serial.println(WiFi.localIP());
-#else
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(100);
-    }
-#endif
-
+    // init the MQTT connection
+    mqtt_client.setServer(MQTT_SERVER_IP, MQTT_SERVER_PORT);
+    mqtt_client.setCallback(mqtt_callback);
 }
 
 // animate returns true if the animation should be stepped.
@@ -252,14 +285,43 @@ void modeRainbowTrain() {
     }
 }
 
+void mqtt_publish_state() {
+    if (state.on) {
+        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_ON, true);
+    } else {
+        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_OFF, true);
+    }
+}
+
+void mqtt_reconnect() {
+    Serial.println("INFO: Attempting MQTT connection...");
+    if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASSWORD)) {
+        Serial.println("INFO: connected");
+        mqtt_publish_state();
+        mqtt_client.subscribe(MQTT_LIGHT_COMMAND_TOPIC);
+    } else {
+        Serial.print("ERROR: failed, rc=");
+        Serial.print(mqtt_client.state());
+        Serial.println("DEBUG: try again in 5 seconds");
+        delay(5000);
+    }
+}
+
 // Read all potentiometers, and run one iteration of the active mode.
 void loop() {
-    settings.mode = 3;
-    settings.var  = 127;
-    settings.hue  = 0;
-    settings.sat  = 255;
-    settings.val  = 100;
+    if (WiFi.status() == WL_CONNECTED) {
+        if (!mqtt_client.connected()) {
+            mqtt_reconnect();
+            return;
+        }
+        mqtt_client.loop();
+    }
 
     modes[settings.mode]();
+    if (state.on) {
+        settings.val = 200;
+    } else {
+        settings.val = 0;
+    }
     FastLED.show();
 }
