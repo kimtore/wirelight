@@ -9,17 +9,15 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-// Serial DEBUG mode on/off
-#undef DEBUG_ANIMATION
-
 #define LIGHT_ON "ON"
 #define LIGHT_OFF "OFF"
 
-// Digital IO pins.
+// Digital IO pin where the LED strip is connected.
+// Pin 4 is GPIO 2.
 #define PIN_LED 4
 
 // Number of LEDs in the strip.
-#define NUM_LEDS 60
+#define NUM_LEDS 30
 
 #define ANIMATION_SPEED 50
 
@@ -44,8 +42,9 @@ struct {
     bool on;
     uint8_t brightness;
     uint8_t temperature;
+    uint16_t mired;
     void (*effectFunc)();
-    char* effect;
+    char effect[64];
     CRGB rgb;
 } state;
 
@@ -96,7 +95,6 @@ void modeSolid() {
 // Fill all LEDs with a solid color on the temperature scale.
 void modeTemperature() {
     fill_solid(&leds[0], NUM_LEDS, HeatColor(state.temperature));
-    FastLED.setBrightness(state.brightness);
 }
 
 // Animate the rainbow.
@@ -131,7 +129,7 @@ void mqtt_publish_state() {
     mqtt_client.publish(MQTT_BRIGHTNESS_STATE_TOPIC, buf, true);
 
     // Color temperature
-    sprintf(buf, "%d", state.temperature);
+    sprintf(buf, "%d", state.mired);
     mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, true);
 }
 
@@ -165,10 +163,15 @@ void mqtt_handle_rgb(const char *payload) {
     color.b = atoi(ptr);
 
     state.rgb = color;
+
+    mqtt_handle_effect("solid");
 }
 
 void mqtt_handle_temperature(const char *payload) {
-    state.temperature = atoi(payload);
+    state.mired = atoi(payload);
+    state.temperature = map(state.mired, 500, 153, 125, 255);
+    Serial.printf("Temperature changed to mired/%d fastled/%d\n", state.mired, state.temperature);
+    mqtt_handle_effect("temperature");
 }
 
 void mqtt_handle_effect(const char *payload) {
@@ -181,7 +184,7 @@ void mqtt_handle_effect(const char *payload) {
     } else {
         return;
     }
-    strcpy(state.effect, payload);
+    strncpy(state.effect, payload, 64);
 }
 
 void mqtt_handle_command(const char *payload) {
@@ -196,14 +199,12 @@ void mqtt_handle_command(const char *payload) {
 
 // function called when a MQTT message arrived
 void mqtt_callback(char* p_topic, byte* p_payload, unsigned int p_length) {
-    char msg[512];
     char payload[256];
 
     memcpy(payload, p_payload, 256);
     payload[p_length] = '\0';
 
-    sprintf(msg, "Topic '%s' received payload: '%s'", p_topic, payload);
-    Serial.println(msg);
+    Serial.printf("Topic '%s' received payload: '%s'\n", p_topic, payload);
 
     if (!strcmp(p_topic, MQTT_LIGHT_COMMAND_TOPIC)) {
         mqtt_handle_command(payload);
@@ -228,6 +229,8 @@ void mqtt_connect() {
         mqtt_client.subscribe(MQTT_LIGHT_COMMAND_TOPIC);
         mqtt_client.subscribe(MQTT_BRIGHTNESS_COMMAND_TOPIC);
         mqtt_client.subscribe(MQTT_RGB_COMMAND_TOPIC);
+        mqtt_client.subscribe(MQTT_EFFECT_COMMAND_TOPIC);
+        mqtt_client.subscribe(MQTT_TEMPERATURE_COMMAND_TOPIC);
     } else {
         Serial.print("ERROR: failed, rc=");
         Serial.print(mqtt_client.state());
@@ -262,5 +265,6 @@ void loop() {
     }
 
     state.effectFunc();
+    FastLED.setBrightness(state.brightness);
     FastLED.show();
 }
