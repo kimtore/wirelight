@@ -246,7 +246,8 @@ void setup() {
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
 
     memset(&state, sizeof state, 0);
-    mqtt_handle_effect("solid");
+    mqtt_handle_brightness("255");
+    mqtt_handle_temperature("300");
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
