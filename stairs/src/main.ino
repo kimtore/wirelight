@@ -136,6 +136,8 @@ void mqtt_publish_state() {
     // Color temperature
     sprintf(buf, "%d", state.mired);
     mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, true);
+
+    Serial.printf("Published current state to MQTT\n");
 }
 
 void mqtt_handle_brightness(const char *payload) {
@@ -175,6 +177,7 @@ void mqtt_handle_rgb(const char *payload) {
 void mqtt_handle_temperature(const char *payload) {
     state.mired = atoi(payload);
     state.temperature = map(state.mired, 500, 153, 125, 255);
+    state.rgb = HeatColor(state.temperature);
     Serial.printf("Temperature changed to mired/%d fastled/%d\n", state.mired, state.temperature);
     mqtt_handle_effect("temperature");
 }
@@ -227,9 +230,9 @@ void mqtt_callback(char* p_topic, byte* p_payload, unsigned int p_length) {
 }
 
 void mqtt_connect() {
-    Serial.println("INFO: Attempting MQTT connection...");
+    Serial.println("Attempting MQTT connection...");
     if (mqtt_client.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASSWORD)) {
-        Serial.println("INFO: connected");
+        Serial.println("MQTT connected");
         mqtt_publish_state();
         mqtt_client.subscribe(MQTT_LIGHT_COMMAND_TOPIC);
         mqtt_client.subscribe(MQTT_BRIGHTNESS_COMMAND_TOPIC);
