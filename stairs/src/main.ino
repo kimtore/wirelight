@@ -12,6 +12,8 @@
 #define LIGHT_ON "ON"
 #define LIGHT_OFF "OFF"
 
+#define SERIAL_SPEED 115200
+
 // Digital IO pin where the LED strip is connected.
 // Pin 4 is GPIO 2.
 #define PIN_LED 4
@@ -241,7 +243,7 @@ void mqtt_connect() {
 
 // Initial setup, called once on boot.
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(SERIAL_SPEED);
 
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
 
