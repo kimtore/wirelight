@@ -21,6 +21,9 @@
 // Number of LEDs in the strip.
 #define NUM_LEDS 30
 
+// Max power usage for the entire strip, in milliwatts
+#define MAX_POWER 4000
+
 #define ANIMATION_SPEED 50
 
 // This variable holds the LED color state.
@@ -246,6 +249,7 @@ void setup() {
     Serial.begin(SERIAL_SPEED);
 
     FastLED.addLeds<NEOPIXEL, PIN_LED>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+    set_max_power_in_milliwatts(MAX_POWER);
 
     memset(&state, sizeof state, 0);
     mqtt_handle_brightness("255");
