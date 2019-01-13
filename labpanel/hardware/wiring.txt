@@ -1,0 +1,10 @@
+NodeMCU     MCP3008
+-------------------
+3.3V        Pin 16
+3.3V        Pin 15
+GND         Pin 14
+D5          Pin 13
+D6          Pin 12
+D7          Pin 11
+D8          Pin 10
+GND         Pin  9
