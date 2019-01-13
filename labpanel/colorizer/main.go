@@ -8,6 +8,7 @@ import (
 	"github.com/eclipse/paho.mqtt.golang"
 	"github.com/lucasb-eyer/go-colorful"
 	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"log"
 	"os"
 	"os/signal"
@@ -16,23 +17,38 @@ import (
 
 const PROGNAME = "colorizer"
 
+func init() {
+	viper.SetConfigName("colorizer")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/etc/")
+	viper.AddConfigPath("/etc/colorizer")
+	viper.AddConfigPath("$HOME/.colorizer/")
+	viper.AddConfigPath(".")
+}
+
 func main() {
-	address := flag.String("address", "tcps://localhost:1883", "host")
-	username := flag.String("username", "", "username")
-	password := flag.String("password", "", "password")
-	clientId := flag.String("clientId", PROGNAME, "clientId")
-	topic := flag.String("topic", "", "topic")
-	bulbs := flag.StringSlice("bulbs", []string{}, "lifx bulb mac addresses")
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+
+	address := viper.GetString("mqtt.address")
+	username := viper.GetString("mqtt.username")
+	password := viper.GetString("mqtt.password")
+	clientId := viper.GetString("mqtt.id")
+	topic := viper.GetString("mqtt.topic")
+	bulbs := viper.GetStringSlice("lifx.bulbs")
 
 	flag.Parse()
 
 	messages := make(chan panel.Panel, 64)
 	signals := make(chan os.Signal, 1)
-	colorizers := make([]effect.Colorizer, len(*bulbs))
+	colorizers := make([]effect.Colorizer, len(bulbs))
 	signal.Notify(signals, os.Interrupt)
 
 	// Set up an effect processor for each of the bulbs
-	for i, mac := range *bulbs {
+	for i, mac := range bulbs {
 		mac = strings.Replace(mac, ":", "", 5)
 		byteAddress, err := hex.DecodeString(mac)
 		if err != nil {
@@ -59,15 +75,15 @@ func main() {
 	// Instantiate a MQTT client. This is where all the color information arrives.
 	opts := mqtt.
 		NewClientOptions().
-		AddBroker(*address).
-		SetUsername(*username).
-		SetPassword(*password).
-		SetClientID(*clientId).
+		AddBroker(address).
+		SetUsername(username).
+		SetPassword(password).
+		SetClientID(clientId).
 		SetCleanSession(true).
 		SetAutoReconnect(true)
 
 	opts.OnConnect = func(c mqtt.Client) {
-		token := c.Subscribe(*topic, byte(0), func(client mqtt.Client, message mqtt.Message) {
+		token := c.Subscribe(topic, byte(0), func(client mqtt.Client, message mqtt.Message) {
 			payload := string(message.Payload())
 			messages <- panel.Parse(payload)
 		})
@@ -84,7 +100,7 @@ func main() {
 		log.Fatal(token.Error())
 	}
 
-	log.Printf("Connected to MQTT server %s on topic %s.\n", *address, *topic)
+	log.Printf("Connected to MQTT server %s on topic %s.\n", address, topic)
 
 	for {
 		select {
