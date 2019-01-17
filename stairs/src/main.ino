@@ -120,25 +120,25 @@ void mqtt_publish_state() {
 
     // State
     if (state.on) {
-        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_ON, true);
+        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_ON, false);
     } else {
-        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_OFF, true);
+        mqtt_client.publish(MQTT_LIGHT_STATE_TOPIC, LIGHT_OFF, false);
     }
 
     // Effect
-    mqtt_client.publish(MQTT_EFFECT_STATE_TOPIC, state.effect, true);
+    mqtt_client.publish(MQTT_EFFECT_STATE_TOPIC, state.effect, false);
 
     // RGB color
     sprintf(buf, "%d,%d,%d", state.rgb.r, state.rgb.g, state.rgb.b);
-    mqtt_client.publish(MQTT_RGB_STATE_TOPIC, buf, true);
+    mqtt_client.publish(MQTT_RGB_STATE_TOPIC, buf, false);
 
     // Brightness
     sprintf(buf, "%d", state.brightness);
-    mqtt_client.publish(MQTT_BRIGHTNESS_STATE_TOPIC, buf, true);
+    mqtt_client.publish(MQTT_BRIGHTNESS_STATE_TOPIC, buf, false);
 
     // Color temperature
     sprintf(buf, "%d", state.mired);
-    mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, true);
+    mqtt_client.publish(MQTT_TEMPERATURE_STATE_TOPIC, buf, false);
 
     Serial.printf("Published current state to MQTT\n");
 }
