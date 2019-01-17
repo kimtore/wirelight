@@ -4,5 +4,7 @@ all:
 upload:
 	pio run -t upload
 
-test: upload
+monitor:
 	pio device monitor -b 115200
+
+test: upload monitor
