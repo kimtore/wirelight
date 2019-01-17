@@ -1,8 +1,11 @@
 // Configuration
 #include "config.h"
 
+// see https://github.com/FastLED/FastLED/issues/306
+#define FASTLED_INTERRUPT_RETRY_COUNT 0
+//#define FASTLED_ALLOW_INTERRUPTS 0
+
 // Use the FastLED library.
-#define FASTLED_ALLOW_INTERRUPTS 0
 #include <FastLED.h>
 
 // Wifi and MQTT
@@ -259,6 +262,7 @@ void setup() {
     mqtt_handle_temperature("300");
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.setSleepMode(WIFI_NONE_SLEEP);
 
     mqtt_client.setServer(MQTT_SERVER_IP, MQTT_SERVER_PORT);
     mqtt_client.setCallback(mqtt_callback);
