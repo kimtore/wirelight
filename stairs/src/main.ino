@@ -1,12 +1,8 @@
 // Configuration
 #include "config.h"
 
-// see https://github.com/FastLED/FastLED/issues/306
-#define FASTLED_INTERRUPT_RETRY_COUNT 0
-//#define FASTLED_ALLOW_INTERRUPTS 0
-
 // Use the FastLED library.
-#include <FastLED.h>
+#include <NeoPixelBus.h>
 
 // Wifi and MQTT
 #include <ESP8266WiFi.h>
@@ -19,6 +15,7 @@
 
 // Digital IO pin where the LED strip is connected.
 // Pin 4 is GPIO 2.
+// FIXME: we have to use the GPIO3 pin on esp8266.
 #define PIN_LED 4
 
 // Number of LEDs in the strip.
@@ -59,6 +56,9 @@ struct {
 // MQTT client handles
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
+
+// LED addressing
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(4, PIN_LED);
 
 // animate returns true if the animation should be stepped.
 uint8_t animate(uint8_t speed) {
