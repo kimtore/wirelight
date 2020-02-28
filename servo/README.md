@@ -9,5 +9,6 @@ For example, command topic for ESPHome light is `laito/light/neopixels/command`,
 Configuration should work out of the box, provided your lights live at `+/light/neopixels/+`.
 
 ```
-export MQTT_USERNAME MQTT_SERVER MQTT_PASSWORD
+# MQTT configuration variables
+export SERVO_USERNAME SERVO_SERVER SERVO_PASSWORD
 ```
