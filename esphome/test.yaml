@@ -1,0 +1,36 @@
+esphome:
+  name: laito
+  platform: ESP8266
+  board: nodemcuv2
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+mqtt:
+  broker: !secret mqtt_broker
+  port: !secret mqtt_port
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  log_topic: !secret mqtt_log_topic
+  discovery: true
+
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2812
+    method: ESP8266_UART1
+    pin: GPIO2
+    num_leds: 60
+    name: "NeoPixels"
+    effects:
+      - addressable_flicker: {}
+      - addressable_rainbow:
+          width: 120
+      - addressable_twinkle: {}
+      - addressable_fireworks: {}
+
+logger:
+  esp8266_store_log_strings_in_flash: false
+
+ota:
