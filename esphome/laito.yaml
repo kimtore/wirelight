@@ -19,8 +19,8 @@ light:
   - platform: neopixelbus
     type: GRB
     variant: WS2812
-    method: ESP8266_UART1
-    pin: GPIO2
+    method: ESP8266_DMA
+    pin: GPIO3
     num_leds: 60
     name: "NeoPixels"
     effects:
@@ -29,6 +29,8 @@ light:
           width: 120
       - addressable_twinkle: {}
       - addressable_fireworks: {}
+      - addressable_color_wipe: {}
+      - addressable_scan: {}
 
 logger:
   esp8266_store_log_strings_in_flash: false
