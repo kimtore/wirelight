@@ -423,11 +423,11 @@ private:
 		}
 		// Bulbs must respond with matching number from request
 		response.sequence = request.sequence;
+    // default to no RES/ACK on packet
+    response.res_ack = NO_RESPONSE;
 
 		switch (request.packet_type)
 		{
-			// default to no RES/ACK on packet
-			response.res_ack = NO_RESPONSE;
 
 		case GET_PAN_GATEWAY:
 		{
@@ -1258,34 +1258,8 @@ private:
 		{
 			float bright = (float)bri / 65535; // Esphome uses 0-1 float for brighness, protocol is 0-65535
 
-			// if we are setting a "white" colour (no saturation)
-			// this doesn't work with homekit bridge on home assistant
-			if (sat < 1)
-			{
-				//debug_println(F("White light enabled"));
-				auto callC = color_led->turn_off();
-				callC.perform();
-
-				auto callW = white_led->turn_on();
-				uint16_t mireds = 1000000 / kel; // Esphome requires mireds, protocol is kelvin
-				callW.set_color_temperature(mireds);
-				callW.set_brightness(bright);
-
-				// this is an attempt to deal with the brightness wheel in the app spamming changes with a duration > packet rate
-				if (dur > lastChange)
-				{
-					callW.set_transition_length(0);
-				}
-				else
-				{
-					callW.set_transition_length(dur);
-				}
-				callW.perform();
-			}
-			else
 			{
 				uint8_t rgbColor[3];
-				auto callW = white_led->turn_off();
 				auto callC = color_led->turn_on();
 
 				// Remap to smaller range.... should consider a better hsb2rgb that supports higher precision
@@ -1302,7 +1276,6 @@ private:
 				callC.set_rgb(r, g, b);
 				callC.set_brightness(bright);
 				callC.set_transition_length(dur);
-				callW.perform();
 				callC.perform();
 			}
 		}
@@ -1312,12 +1285,6 @@ private:
 			callC.set_brightness(0);
 			callC.set_transition_length(dur);
 			callC.perform();
-
-			auto callW = white_led->turn_off();
-			callW.set_brightness(0);
-			// fade to black
-			callW.set_transition_length(dur);
-			callW.perform();
 		}
 		lastChange = millis(); // throttle transitions based on last change
 	}
