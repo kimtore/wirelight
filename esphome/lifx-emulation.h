@@ -5,7 +5,6 @@
 
 //#define DEBUG
 //#define MQTT
-//#define DIYHUE
 
 #ifdef DEBUG
 #define debug_print(x, ...) Serial.print(x, ##__VA_ARGS__)
@@ -260,13 +259,6 @@ public:
 
 		setLight(); // will (not) turn light on at boot.... why?
 
-#ifdef DIYHUE
-		if (HueUdp.listen(2100))
-		{
-			ESP_LOGD("DiyHueUDP", "Listerner Enabled");
-			HueUdp.onPacket([&](AsyncUDPPacket &packet) { entertainment(packet); });
-		}
-#endif
 	}
 
 	void on_mqtt_message(const String &payload)
@@ -282,18 +274,6 @@ public:
 
 	void loop() override
 	{
-#ifdef DIYHUE
-		//TODO: Need to add bulb state watching here if things are changed outside this protocol
-		if (entertainment_switch->state)
-		{
-			if ((millis() - lastUDPmilsec) >= entertainmentTimeout)
-			{
-				{
-					entertainment_switch->turn_off();
-				}
-			}
-		}
-#endif
 	}
 
 private:
@@ -338,41 +318,6 @@ private:
 
 	// Should probably check if wifi is up first before doing this
 	AsyncUDP Udp;
-
-#ifdef DIYHUE
-	AsyncUDP HueUdp;
-
-	// this is a DiyHue entertainment call
-	void entertainment(AsyncUDPPacket &packet)
-	{
-		ESP_LOGD("DiyHueUDP", "Entertainment packet arrived");
-		auto call = white_led->turn_off(); //turn off white_led when entertainment starts
-		call.set_transition_length(0);
-		call.perform();
-		if (!entertainment_switch->state)
-		{
-			entertainment_switch->turn_on();
-		}
-		lastUDPmilsec = millis(); //reset timeout value
-		uint8_t *packetBuffer = packet.data();
-		uint32_t packetSize = packet.length();
-		call = color_led->turn_on();
-		if (((packetBuffer[1]) + (packetBuffer[2]) + (packetBuffer[3])) == 0)
-		{
-			call.set_rgb(0, 0, 0);
-			call.set_brightness(0);
-			call.set_transition_length(0);
-			call.perform();
-		}
-		else
-		{
-			call.set_rgb(packetBuffer[1] / maxColor, packetBuffer[2] / maxColor, packetBuffer[3] / maxColor);
-			call.set_transition_length(0);
-			call.set_brightness(packetBuffer[4] / maxColor);
-			call.perform();
-		}
-	}
-#endif
 
 	/******************************************************************************************************************
 	 * incomingUDP( AsyncUDPPacket )
