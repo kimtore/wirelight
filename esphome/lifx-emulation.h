@@ -3,7 +3,7 @@
 #include "esphome.h"
 #include <ESPAsyncUDP.h>
 
-//#define DEBUG
+#define DEBUG
 //#define MQTT
 
 #ifdef DEBUG
