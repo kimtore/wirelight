@@ -10,6 +10,7 @@ esphome:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  fast_connect: true
 
 # Lifx emulation needs UTC time to respond to packets correctly.  Code expects id: ha_time.
 time:
@@ -22,7 +23,7 @@ light:
     variant: WS2812
     method: ESP8266_DMA
     pin: GPIO3
-    num_leds: 60
+    num_leds: 59
     id: color_led
     name: "color_led"
 
