@@ -1,0 +1,4 @@
+/build-*/
+.pioenvs
+.piolibdeps
+.pio
