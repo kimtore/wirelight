@@ -4,6 +4,7 @@ mod rgb;
 use anyhow::{bail, Result};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::prelude::Peripherals;
+use esp_idf_svc::sys::periph_module_t_PERIPH_AES_MODULE;
 use log::info;
 use rgb::{RGB8, WS2812RMT};
 
@@ -29,6 +30,8 @@ fn main() -> Result<()> {
 
     let peripherals = Peripherals::take().unwrap();
     let sysloop = EspSystemEventLoop::take()?;
+    let spi = peripherals.spi1;
+    peripherals.
 
     // Start the LED off yellow
     let mut led = WS2812RMT::new(peripherals.pins.gpio8, peripherals.rmt.channel0)?;
@@ -38,7 +41,7 @@ fn main() -> Result<()> {
     let app_config = CONFIG;
 
     // Connect to the Wi-Fi network
-    let _wifi = match wifi::connect(
+    let wifi = match wifi::connect(
         app_config.wifi_ssid,
         app_config.wifi_psk,
         peripherals.modem,
@@ -52,7 +55,14 @@ fn main() -> Result<()> {
         }
     };
 
+    //let mut ledstrip = ws2812_esp32_rmt_drIiver::LedPixelStrip<2>;
+    let led_driver = ws2812_esp32_rmt_driver::Ws2812Esp32Rmt::new(1, 2)?;
+    let led_rmt = ws2812_esp32_rmt_driver::LedPixelEsp32Rmt::new(1, 2)?;
+
     loop {
+        if !wifi.is_up()? {
+            bail!("Wi-Fi connection dropped");
+        }
         // Blue!
         led.set_pixel(RGB8::new(0, 0, 50))?;
         // Wait...
