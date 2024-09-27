@@ -5,9 +5,21 @@ use esp_idf_hal::gpio::AnyIOPin;
 use esp_idf_hal::prelude::{FromValueType, Peripherals};
 use esp_idf_hal::spi::{Dma, SpiBusDriver, SpiDriver};
 use esp_idf_hal::spi::config::Config;
+use esp_idf_sys::{useconds_t, usleep};
 use smart_leds::hsv::{hsv2rgb, Hsv};
 use smart_leds::{brightness, SmartLedsWrite, RGB8};
 use ws2812_spi::Ws2812;
+
+pub mod intervals {
+    use esp_idf_sys::useconds_t;
+
+    pub const SECOND: useconds_t = 1_000_000;
+    pub const HALF_SECOND: useconds_t = 500_000;
+    pub const QUARTER_SECOND: useconds_t = 250_000;
+    pub const SIXTH_SECOND: useconds_t = 166_667;
+    pub const EIGTHT_SECOND: useconds_t = 125_000;
+    pub const TWELWTH_SECOND: useconds_t = 83_334;
+}
 
 #[no_mangle]
 unsafe fn main() {
@@ -21,6 +33,7 @@ unsafe fn main() {
     log::info!("Hello, world!");
 
     let peripherals = Peripherals::take().unwrap();
+
     let driver = SpiDriver::new_without_sclk(
         peripherals.spi2,
         peripherals.pins.gpio8,
@@ -28,20 +41,69 @@ unsafe fn main() {
         &esp_idf_hal::spi::config::DriverConfig::new().dma(Dma::Auto(512)),
     ).unwrap();
 
-    led_task(driver);
+    let spi_bus = SpiBusDriver::new(
+        driver,
+        &Config::new().baudrate(3_200.kHz().into()),
+    ).unwrap();
+
+    let mut ws = Ws2812::new(spi_bus);
+
+    led_blink(
+        &mut ws,
+        RGB8::new(255, 0, 0),
+        RGB8::new(0, 0, 0),
+        intervals::SECOND,
+        intervals::TWELWTH_SECOND,
+        1,
+    );
+
+    led_blink(
+        &mut ws,
+        RGB8::new(0, 0, 255),
+        RGB8::new(0, 0, 0),
+        intervals::TWELWTH_SECOND,
+        intervals::TWELWTH_SECOND,
+        2,
+    );
+
+    loop {
+
+    led_blink(
+        &mut ws,
+        RGB8::new(0, 100, 0),
+        RGB8::new(0, 0, 0),
+        intervals::TWELWTH_SECOND,
+        intervals::TWELWTH_SECOND,
+        120,
+    );
+    }
 }
 
-#[derive(Debug)]
-pub enum Error {}
+pub unsafe fn led_blink<'a>(
+    ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>,
+    on_color: RGB8,
+    off_color: RGB8,
+    duty_cycle_on_usec: useconds_t,
+    duty_cycle_off_usec: useconds_t,
+    count: usize,
+) {
+    let on = [on_color; 1];
+    let off = [off_color; 1];
 
-pub fn led_task(driver: SpiDriver) {
-    let bus = SpiBusDriver::new(driver, &Config::new().baudrate(3_200.kHz().into())).unwrap();
-    let mut ws = Ws2812::new(bus);
+    for _ in 0..count {
+        ws.write(on).unwrap();
+        usleep(duty_cycle_on_usec);
+        ws.write(off).unwrap();
+        usleep(duty_cycle_off_usec);
+    }
+}
+
+pub fn rainbow_cycle<'a>(ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>) {
     let mut data = [RGB8::default(); 1];
     #[allow(clippy::infinite_iter)]
     (0..=255).cycle().for_each(|hue| {
         unsafe {
-            esp_idf_sys::usleep(10_000);
+            usleep(10_000);
         }
         data[0] = hsv2rgb(Hsv {
             hue,

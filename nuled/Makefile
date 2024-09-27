@@ -1,5 +1,5 @@
 build:
 	cargo build --release
 
-flash:
+flash: build
 	espflash flash target/riscv32imc-esp-espidf/release/nuled
