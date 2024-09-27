@@ -2,6 +2,7 @@
 #![no_main]
 
 use esp_idf_hal::gpio::AnyIOPin;
+use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_hal::prelude::{FromValueType, Peripherals};
 use esp_idf_hal::spi::{Dma, SpiBusDriver, SpiDriver};
 use esp_idf_hal::spi::config::Config;
@@ -19,7 +20,12 @@ pub mod intervals {
     pub const SIXTH_SECOND: useconds_t = 166_667;
     pub const EIGTHT_SECOND: useconds_t = 125_000;
     pub const TWELWTH_SECOND: useconds_t = 83_334;
+    pub const SIXTEENTH_SECOND: useconds_t = 61_250;
+
+    pub const IMMEDIATELY: useconds_t = 0;
 }
+
+const LED_COUNT: usize = 60;
 
 #[no_mangle]
 unsafe fn main() {
@@ -33,9 +39,10 @@ unsafe fn main() {
     log::info!("Hello, world!");
 
     let peripherals = Peripherals::take().unwrap();
+    let spi2 = peripherals.spi2.into_ref();
 
     let driver = SpiDriver::new_without_sclk(
-        peripherals.spi2,
+        spi2,
         peripherals.pins.gpio8,
         Option::<AnyIOPin>::None,
         &esp_idf_hal::spi::config::DriverConfig::new().dma(Dma::Auto(512)),
@@ -48,34 +55,29 @@ unsafe fn main() {
 
     let mut ws = Ws2812::new(spi_bus);
 
-    led_blink(
-        &mut ws,
-        RGB8::new(255, 0, 0),
-        RGB8::new(0, 0, 0),
-        intervals::SECOND,
-        intervals::TWELWTH_SECOND,
-        1,
-    );
-
-    led_blink(
-        &mut ws,
-        RGB8::new(0, 0, 255),
-        RGB8::new(0, 0, 0),
-        intervals::TWELWTH_SECOND,
-        intervals::TWELWTH_SECOND,
-        2,
-    );
+    // Boot sequence
+    {
+        led_blink(
+            &mut ws,
+            RGB8::new(0, 255, 0),
+            RGB8::new(0, 0, 0),
+            intervals::SECOND,
+            intervals::TWELWTH_SECOND,
+            1,
+        );
+    }
 
     loop {
-
-    led_blink(
-        &mut ws,
-        RGB8::new(0, 100, 0),
-        RGB8::new(0, 0, 0),
-        intervals::TWELWTH_SECOND,
-        intervals::TWELWTH_SECOND,
-        120,
-    );
+        for hue in 0..=255 {
+            led_blink(
+                &mut ws,
+                hsv2rgb(Hsv { hue, sat: 255, val: 120 }),
+                hsv2rgb(Hsv { hue, sat: 255, val: 30 }),
+                intervals::TWELWTH_SECOND,
+                intervals::TWELWTH_SECOND,
+                1,
+            );
+        }
     }
 }
 
@@ -85,12 +87,12 @@ pub unsafe fn led_blink<'a>(
     off_color: RGB8,
     duty_cycle_on_usec: useconds_t,
     duty_cycle_off_usec: useconds_t,
-    count: usize,
+    cycles: usize,
 ) {
-    let on = [on_color; 1];
-    let off = [off_color; 1];
+    let on = [on_color; LED_COUNT];
+    let off = [off_color; LED_COUNT];
 
-    for _ in 0..count {
+    for _ in 0..cycles {
         ws.write(on).unwrap();
         usleep(duty_cycle_on_usec);
         ws.write(off).unwrap();
