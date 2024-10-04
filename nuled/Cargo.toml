@@ -1,39 +1,51 @@
 [package]
 name = "nuled"
-version = "0.1.0"
+version = "2.0.0"
 authors = ["Kim Tore Jensen <kimtjen@gmail.com>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
-[[bin]]
-name = "nuled"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
-
-[profile.release]
-opt-level = "s"
+[dependencies]
+esp-backtrace = { version = "0.14.0", features = ["esp32c3", "exception-handler", "panic-handler", "println"] }
+esp-hal = { version = "0.20.1", features = [ "esp32c3", "embedded-hal" ] }
+esp-println = { version = "0.11.0", features = ["esp32c3", "log", "colors"] }
+log = { version = "0.4.21" }
+esp-alloc = { version = "0.4.0" }
+embedded-io = "0.6.1"
+esp-wifi = { version = "0.9.1", features = [
+    "esp32c3",
+    "phy-enable-usb",
+    "utils",
+    "wifi",
+] }
+heapless = { version = "0.8.0", default-features = false }
+smoltcp = { version = "0.11.0", default-features = false, features = [
+    "medium-ethernet",
+    "proto-dhcpv4",
+    "proto-igmp",
+    "proto-ipv4",
+    "socket-dhcpv4",
+    "socket-icmp",
+    "socket-raw",
+    "socket-tcp",
+    "socket-udp",
+] }
+embedded-hal = "1.0.0"
+ws2812-spi = "0.5.0"
+smart-leds = "0.4.0"
+esp32c3 = { version = "0.25.0", features = ["critical-section"] }
 
 [profile.dev]
-debug = true    # Symbols are nice and they don't increase the size on Flash
-opt-level = "z"
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
 
-[features]
-#default = ["alloc", "embassy", "esp-idf-svc/native", "esp-idf-svc/panic_handler", "esp-idf-svc/alloc_handler", "esp-idf-svc/libstart"]
-default = ["alloc", "esp-idf-svc/critical-section", "esp-idf-svc/native", "esp-idf-svc/panic_handler", "esp-idf-svc/alloc_handler", "esp-idf-svc/libstart"]
-pio = ["esp-idf-svc/pio"]
-alloc = ["esp-idf-svc/alloc"]
-nightly = ["esp-idf-svc/nightly"]
-experimental = ["esp-idf-svc/experimental"]
-embassy = ["esp-idf-svc/embassy-sync", "esp-idf-svc/critical-section", "esp-idf-svc/embassy-time-driver"]
-
-[dependencies]
-log = { version = "0.4", default-features = false }
-esp-idf-svc = { version = "0.49", default-features = false }
-smart-leds = { version = "0.4", features = [] }
-ws2812-spi = { version = "0.5", features = [] }
-critical-section = "1.1.3"
-#esp-wifi = { version = "0.9.1", features = ["esp32c3", "wifi"] }
-#static_cell = { version = "2.1.0", features = [] }
-
-[build-dependencies]
-embuild = "0.32.0"
+[profile.release]
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false

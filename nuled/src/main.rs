@@ -1,183 +1,79 @@
 #![no_std]
 #![no_main]
 
-use esp_idf_svc::hal::gpio::AnyIOPin;
-use esp_idf_svc::hal::peripheral::Peripheral;
-use esp_idf_svc::hal::prelude::{FromValueType, Peripherals};
-use esp_idf_svc::hal::spi::config::Config;
-use esp_idf_svc::hal::spi::{self, Dma, SpiBusDriver, SpiDriver};
-use esp_idf_svc::sys::usleep;
-use esp_idf_svc::{sys, wifi};
-use smart_leds::hsv::{hsv2rgb, Hsv};
-use smart_leds::RGB8;
+use esp_backtrace as _;
+use esp_hal::clock::ClockControl;
+use esp_hal::dma::DmaPriority;
+use esp_hal::gpio::Io;
+use esp_hal::peripherals::Peripherals;
+use esp_hal::prelude::_fugit_RateExtU32;
+use esp_hal::spi::SpiMode;
+use esp_hal::system::SystemControl;
+use smart_leds::hsv::Hsv;
+use smart_leds::{SmartLedsWrite};
 use ws2812_spi::Ws2812;
 
-pub mod intervals {
-    use esp_idf_svc::sys::useconds_t;
-
-    pub const SECOND: useconds_t = 1_000_000;
-    pub const HALF_SECOND: useconds_t = 500_000;
-    pub const QUARTER_SECOND: useconds_t = 250_000;
-    pub const SIXTH_SECOND: useconds_t = 166_667;
-    pub const EIGTHT_SECOND: useconds_t = 125_000;
-    pub const TWELWTH_SECOND: useconds_t = 83_334;
-    pub const SIXTEENTH_SECOND: useconds_t = 61_250;
-
-    pub const IMMEDIATELY: useconds_t = 0;
-}
-
+#[allow(dead_code)]
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
+#[allow(dead_code)]
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
+#[allow(dead_code)]
 const LED_COUNT: usize = 60;
 
-static CS: esp_idf_svc::hal::task::CriticalSection = esp_idf_svc::hal::task::CriticalSection::new();
-
 #[no_mangle]
-unsafe fn main() {
-    // It is necessary to call this function once. Otherwise some patches to the runtime
-    // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
-    sys::link_patches();
+fn main() {
+    esp_println::logger::init_logger(log::LevelFilter::Trace);
 
-    // Bind the log crate to the ESP Logging facilities
-    esp_idf_svc::log::EspLogger::initialize_default();
+    log::info!("NULED booting.");
 
-    log::info!("NULED main() starting.");
+    let peripherals = Peripherals::take();
+    let system = SystemControl::new(peripherals.SYSTEM);
+    let clocks = ClockControl::max(system.clock_control).freeze();
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+    let dma = esp_hal::dma::Dma::new(peripherals.DMA);
+    let dma_channel_0 = dma.channel0.configure(true, DmaPriority::Priority9);
 
-    let peripherals = Peripherals::take().unwrap();
-    let spi2 = peripherals.spi2.into_ref();
+    let (
+        tx_buffer,
+        tx_descriptors,
+        rx_buffer,
+        rx_descriptors
+    ) = esp_hal::dma_buffers!(512);
 
-    let driver = SpiDriver::new_without_sclk(
-        spi2,
-        peripherals.pins.gpio8,
-        Option::<AnyIOPin>::None,
-        &spi::config::DriverConfig::new().dma(Dma::Auto(512)),
-    ).unwrap();
+    log::info!("Setting up DMA buffers.");
 
-    let spi_bus = SpiBusDriver::new(
-        driver,
-        &Config::new().baudrate(3_200.kHz().into()),
-    ).unwrap();
+    let tx_dma = esp_hal::dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let rx_dma = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    // LED writer
-    let mut ws = Ws2812::new(spi_bus);
+    log::info!("Initializing SPI driver at 3.2MHz");
+
+    let spi = esp_hal::spi::master::Spi::new(
+        peripherals.SPI2,
+        3_200.kHz(),
+        SpiMode::Mode1,
+        &clocks,
+    )
+        .with_mosi(io.pins.gpio8)
+        .with_dma(dma_channel_0)
+        ;
+
+    log::info!("Initializing SPI DMA bus...");
+
+    let spi_driver = esp_hal::spi::master::SpiDmaBus::new(spi, tx_dma, rx_dma);
+
+    let mut ws = Ws2812::new(spi_driver);
 
     log::info!("WS2812 driver started on SPI2 and GPIO8.");
 
-    // WiFi starting
-    led::blink(
-        &mut ws,
-        RGB8::new(0, 0, 255),
-        RGB8::new(0, 0, 0),
-        intervals::SIXTH_SECOND,
-        intervals::SIXTH_SECOND,
-        3,
-    );
-
-    log::info!("Starting WiFi driver.");
-
-    let event_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
-    let non_volatile_storage = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
-
-    let mut wifi_driver = wifi::EspWifi::new(
-        peripherals.modem,
-        event_loop,
-        Some(non_volatile_storage),
-    ).unwrap();
-
-    wifi_driver.set_configuration(&wifi::Configuration::Client(wifi::ClientConfiguration {
-        ssid: WIFI_SSID.parse().unwrap(),
-        password: WIFI_PASSWORD.parse().unwrap(),
-        auth_method: wifi::AuthMethod::WPA2Personal,
-        ..Default::default()
-    })).unwrap();
-
-    wifi_driver.start().unwrap();
-    wifi_driver.connect().unwrap();
-
-    log::info!("Waiting for network...");
-
-    loop {
-        if wifi_driver.is_up().unwrap() {
-            break;
-        }
-        usleep(intervals::EIGTHT_SECOND);
-    }
-
-    log::info!("Network online. Starting main program.");
-
-    // Boot sequence finished
-    led::fill(&mut ws, RGB8::new(0, 255, 0));
-    usleep(intervals::SECOND);
-
-    // Test program: blink through each color hue
     loop {
         for hue in 0..=255 {
-            led::blink(
-                &mut ws,
-                hsv2rgb(Hsv { hue, sat: 255, val: 120 }),
-                hsv2rgb(Hsv { hue, sat: 255, val: 30 }),
-                intervals::QUARTER_SECOND,
-                intervals::QUARTER_SECOND,
-                1,
-            );
-        }
-    }
-}
-
-pub mod led {
-    use crate::{intervals, CS, LED_COUNT};
-    use esp_idf_svc::hal::spi::{SpiBusDriver, SpiDriver};
-    use esp_idf_svc::sys::{useconds_t, usleep};
-    use smart_leds::hsv::{hsv2rgb, Hsv};
-    use smart_leds::{SmartLedsWrite, RGB8};
-    use ws2812_spi::Ws2812;
-
-    pub unsafe fn fill<'a>(
-        ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>,
-        color: RGB8,
-    ) {
-        let data = [color; LED_COUNT];
-        let _guard = CS.enter();
-        ws.write(data).unwrap();
-    }
-
-    pub unsafe fn blink<'a>(
-        ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>,
-        on_color: RGB8,
-        off_color: RGB8,
-        duty_cycle_on_usec: useconds_t,
-        duty_cycle_off_usec: useconds_t,
-        cycles: usize,
-    ) {
-        for _ in 0..cycles {
-            /*
-            critical_section::with(|_| {
-                ws.write(on).unwrap();
+            let color = smart_leds::hsv::hsv2rgb(Hsv {
+                hue,
+                sat: 255,
+                val: 255,
             });
-            usleep(duty_cycle_on_usec);
-            critical_section::with(|_| {
-                ws.write(off).unwrap();
-            });
-            usleep(duty_cycle_off_usec);
-
-             */
-            fill(ws, on_color);
-            usleep(duty_cycle_on_usec);
-            fill(ws, off_color);
-            usleep(duty_cycle_off_usec);
-        }
-    }
-
-    pub unsafe fn test_program<'a>(ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>) {
-        for hue in 0..=255 {
-            blink(
-                ws,
-                hsv2rgb(Hsv { hue, sat: 255, val: 120 }),
-                hsv2rgb(Hsv { hue, sat: 255, val: 30 }),
-                intervals::QUARTER_SECOND,
-                intervals::QUARTER_SECOND,
-                1,
-            );
+            let data = [color; LED_COUNT];
+            ws.write(data).unwrap();
         }
     }
 }
