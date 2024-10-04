@@ -30,6 +30,8 @@ const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 const LED_COUNT: usize = 60;
 
+static CS: esp_idf_svc::hal::task::CriticalSection = esp_idf_svc::hal::task::CriticalSection::new();
+
 #[no_mangle]
 unsafe fn main() {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -123,7 +125,7 @@ unsafe fn main() {
 }
 
 pub mod led {
-    use crate::{intervals, LED_COUNT};
+    use crate::{intervals, CS, LED_COUNT};
     use esp_idf_svc::hal::spi::{SpiBusDriver, SpiDriver};
     use esp_idf_svc::sys::{useconds_t, usleep};
     use smart_leds::hsv::{hsv2rgb, Hsv};
@@ -134,8 +136,9 @@ pub mod led {
         ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>,
         color: RGB8,
     ) {
-        let on = [color; LED_COUNT];
-        ws.write(on).unwrap();
+        let data = [color; LED_COUNT];
+        let _guard = CS.enter();
+        ws.write(data).unwrap();
     }
 
     pub unsafe fn blink<'a>(
@@ -146,13 +149,21 @@ pub mod led {
         duty_cycle_off_usec: useconds_t,
         cycles: usize,
     ) {
-        let on = [on_color; LED_COUNT];
-        let off = [off_color; LED_COUNT];
-
         for _ in 0..cycles {
-            ws.write(on).unwrap();
+            /*
+            critical_section::with(|_| {
+                ws.write(on).unwrap();
+            });
             usleep(duty_cycle_on_usec);
-            ws.write(off).unwrap();
+            critical_section::with(|_| {
+                ws.write(off).unwrap();
+            });
+            usleep(duty_cycle_off_usec);
+
+             */
+            fill(ws, on_color);
+            usleep(duty_cycle_on_usec);
+            fill(ws, off_color);
             usleep(duty_cycle_off_usec);
         }
     }
