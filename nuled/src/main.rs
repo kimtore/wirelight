@@ -71,7 +71,7 @@ unsafe fn main() {
         3,
     );
 
-    //let lwip = netif::EspNetif::new(netif::NetifStack::Sta).unwrap();
+    log::info!("Starting WiFi driver.");
 
     let event_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
     let non_volatile_storage = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
@@ -92,7 +92,16 @@ unsafe fn main() {
     wifi_driver.start().unwrap();
     wifi_driver.connect().unwrap();
 
-    log::info!("Setup complete. Starting main program.");
+    log::info!("Waiting for network...");
+
+    loop {
+        if wifi_driver.is_up().unwrap() {
+            break;
+        }
+        usleep(intervals::EIGTHT_SECOND);
+    }
+
+    log::info!("Network online. Starting main program.");
 
     // Boot sequence finished
     led::fill(&mut ws, RGB8::new(0, 255, 0));
