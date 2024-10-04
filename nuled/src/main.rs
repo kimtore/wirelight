@@ -1,19 +1,19 @@
 #![no_std]
 #![no_main]
 
-use esp_idf_hal::gpio::AnyIOPin;
-use esp_idf_hal::peripheral::Peripheral;
-use esp_idf_hal::prelude::{FromValueType, Peripherals};
-use esp_idf_hal::spi::config::Config;
-use esp_idf_hal::spi::{Dma, SpiBusDriver, SpiDriver};
-use esp_idf_sys::{usleep};
+use esp_idf_svc::hal::gpio::AnyIOPin;
+use esp_idf_svc::hal::peripheral::Peripheral;
+use esp_idf_svc::hal::prelude::{FromValueType, Peripherals};
+use esp_idf_svc::hal::spi::config::Config;
+use esp_idf_svc::hal::spi::{self, Dma, SpiBusDriver, SpiDriver};
+use esp_idf_svc::sys::usleep;
+use esp_idf_svc::{sys, wifi};
 use smart_leds::hsv::{hsv2rgb, Hsv};
-use smart_leds::{RGB8};
+use smart_leds::RGB8;
 use ws2812_spi::Ws2812;
-use crate::intervals::SECOND;
 
 pub mod intervals {
-    use esp_idf_sys::useconds_t;
+    use esp_idf_svc::sys::useconds_t;
 
     pub const SECOND: useconds_t = 1_000_000;
     pub const HALF_SECOND: useconds_t = 500_000;
@@ -26,38 +26,29 @@ pub mod intervals {
     pub const IMMEDIATELY: useconds_t = 0;
 }
 
+const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
+const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 const LED_COUNT: usize = 60;
 
 #[no_mangle]
 unsafe fn main() {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
-    esp_idf_svc::sys::link_patches();
+    sys::link_patches();
 
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    log::info!("NULED booted!");
+    log::info!("NULED main() starting.");
 
     let peripherals = Peripherals::take().unwrap();
     let spi2 = peripherals.spi2.into_ref();
-
-    /*
-    let mut power_config = esp_idf_svc::sys::esp_pm_config_esp32c3_t {
-        max_freq_mhz: 160,
-        min_freq_mhz: 160,
-        light_sleep_enable: false,
-    };
-
-    let result = esp!(unsafe { esp_idf_svc::sys::esp_pm_configure(&mut power_config as *mut _ as *const c_void) });
-    result.unwrap();
-     */
 
     let driver = SpiDriver::new_without_sclk(
         spi2,
         peripherals.pins.gpio8,
         Option::<AnyIOPin>::None,
-        &esp_idf_hal::spi::config::DriverConfig::new().dma(Dma::Auto(512)),
+        &spi::config::DriverConfig::new().dma(Dma::Auto(512)),
     ).unwrap();
 
     let spi_bus = SpiBusDriver::new(
@@ -68,9 +59,44 @@ unsafe fn main() {
     // LED writer
     let mut ws = Ws2812::new(spi_bus);
 
+    log::info!("WS2812 driver started on SPI2 and GPIO8.");
+
+    // WiFi starting
+    led::blink(
+        &mut ws,
+        RGB8::new(0, 0, 255),
+        RGB8::new(0, 0, 0),
+        intervals::SIXTH_SECOND,
+        intervals::SIXTH_SECOND,
+        3,
+    );
+
+    //let lwip = netif::EspNetif::new(netif::NetifStack::Sta).unwrap();
+
+    let event_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
+    let non_volatile_storage = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
+
+    let mut wifi_driver = wifi::EspWifi::new(
+        peripherals.modem,
+        event_loop,
+        Some(non_volatile_storage),
+    ).unwrap();
+
+    wifi_driver.set_configuration(&wifi::Configuration::Client(wifi::ClientConfiguration {
+        ssid: WIFI_SSID.parse().unwrap(),
+        password: WIFI_PASSWORD.parse().unwrap(),
+        auth_method: wifi::AuthMethod::WPA2Personal,
+        ..Default::default()
+    })).unwrap();
+
+    wifi_driver.start().unwrap();
+    wifi_driver.connect().unwrap();
+
+    log::info!("Setup complete. Starting main program.");
+
     // Boot sequence finished
     led::fill(&mut ws, RGB8::new(0, 255, 0));
-    usleep(SECOND);
+    usleep(intervals::SECOND);
 
     // Test program: blink through each color hue
     loop {
@@ -88,12 +114,12 @@ unsafe fn main() {
 }
 
 pub mod led {
-    use esp_idf_hal::spi::{SpiBusDriver, SpiDriver};
-    use esp_idf_sys::{useconds_t, usleep};
-    use smart_leds::{SmartLedsWrite, RGB8};
-    use smart_leds::hsv::{hsv2rgb, Hsv};
-    use ws2812_spi::Ws2812;
     use crate::{intervals, LED_COUNT};
+    use esp_idf_svc::hal::spi::{SpiBusDriver, SpiDriver};
+    use esp_idf_svc::sys::{useconds_t, usleep};
+    use smart_leds::hsv::{hsv2rgb, Hsv};
+    use smart_leds::{SmartLedsWrite, RGB8};
+    use ws2812_spi::Ws2812;
 
     pub unsafe fn fill<'a>(
         ws: &mut Ws2812<SpiBusDriver<'a, SpiDriver<'a>>>,
