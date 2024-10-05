@@ -3,15 +3,16 @@
 
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
+use esp_hal::delay::Delay;
 use esp_hal::dma::DmaPriority;
 use esp_hal::gpio::Io;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
+use esp_hal::riscv::_export::critical_section;
 use esp_hal::rng::Rng;
 use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
-use esp_wifi::{EspWifiInitialization, InitializationError};
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use ws2812_spi::Ws2812;
@@ -35,6 +36,7 @@ fn main() {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let dma = esp_hal::dma::Dma::new(peripherals.DMA);
     let dma_channel_0 = dma.channel0.configure(true, DmaPriority::Priority9);
+    let delay = Delay::new(&clocks);
 
     let (
         tx_buffer,
@@ -116,14 +118,16 @@ fn main() {
     log::info!("WiFi connect started.");
 
     loop {
-        for hue in 0..=255 {
-            let color = smart_leds::hsv::hsv2rgb(Hsv {
-                hue,
-                sat: 255,
-                val: 255,
-            });
-            let data = [color; LED_COUNT];
-            ws.write(data).unwrap();
+        let sat = 255;
+        for hue in [0, 85, 170] {
+            for val in 0..=255 {
+                let color = smart_leds::hsv::hsv2rgb(Hsv { hue, sat, val });
+                let data = [color; LED_COUNT];
+                critical_section::with(|_| {
+                    ws.write(data).unwrap();
+                });
+                delay.delay_millis(50);
+            }
         }
     }
 }
