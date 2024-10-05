@@ -6,11 +6,14 @@ use esp_hal::clock::ClockControl;
 use esp_hal::dma::DmaPriority;
 use esp_hal::gpio::Io;
 use esp_hal::peripherals::Peripherals;
-use esp_hal::prelude::_fugit_RateExtU32;
+use esp_hal::prelude::*;
+use esp_hal::rng::Rng;
 use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
+use esp_hal::timer::timg::TimerGroup;
+use esp_wifi::{EspWifiInitialization, InitializationError};
 use smart_leds::hsv::Hsv;
-use smart_leds::{SmartLedsWrite};
+use smart_leds::SmartLedsWrite;
 use ws2812_spi::Ws2812;
 
 #[allow(dead_code)]
@@ -22,7 +25,7 @@ const LED_COUNT: usize = 60;
 
 #[no_mangle]
 fn main() {
-    esp_println::logger::init_logger(log::LevelFilter::Trace);
+    esp_println::logger::init_logger(log::LevelFilter::Info);
 
     log::info!("NULED booting.");
 
@@ -64,6 +67,53 @@ fn main() {
     let mut ws = Ws2812::new(spi_driver);
 
     log::info!("WS2812 driver started on SPI2 and GPIO8.");
+
+    let wifi_timer = TimerGroup::new(peripherals.TIMG1, &clocks).timer0;
+    //let wifi_timer = PeriodicTimer::new(SystemTimer::new(peripherals.SYSTIMER).alarm0.into());
+    let wifi_rng = Rng::new(peripherals.RNG);
+
+    log::info!("Initializing WiFi configuration.");
+
+    let wifi_init = esp_wifi::initialize(
+        esp_wifi::EspWifiInitFor::Wifi,
+        wifi_timer,
+        wifi_rng,
+        peripherals.RADIO_CLK,
+        &clocks,
+    );
+
+    match wifi_init {
+        Ok(_) => {}
+        Err(err) => {
+            log::info!("wifi setup error: {:?}", err);
+        }
+    }
+    let wifi_init = wifi_init.unwrap();
+
+    log::info!("Configuring WiFi for station mode.");
+
+    let wifi_config = esp_wifi::wifi::ClientConfiguration {
+        ssid: WIFI_SSID.parse().unwrap(),
+        password: WIFI_PASSWORD.parse().unwrap(),
+        auth_method: esp_wifi::wifi::AuthMethod::WPA2Personal,
+        ..Default::default()
+    };
+    let (_wifi_device, mut wifi_controller) =
+        esp_wifi::wifi::new_with_config::<esp_wifi::wifi::WifiStaDevice>(
+            &wifi_init,
+            peripherals.WIFI,
+            wifi_config,
+        ).unwrap();
+
+    log::info!("Starting WiFi controller.");
+
+    wifi_controller.start().unwrap();
+
+    log::info!("Connecting WiFi...");
+
+    wifi_controller.connect().unwrap();
+
+    log::info!("WiFi connect started.");
 
     loop {
         for hue in 0..=255 {

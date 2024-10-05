@@ -8,20 +8,22 @@ rust-version = "1.77"
 
 [dependencies]
 esp-backtrace = { version = "0.14.0", features = ["esp32c3", "exception-handler", "panic-handler", "println"] }
-esp-hal = { version = "0.20.1", features = [ "esp32c3", "embedded-hal" ] }
+esp-hal = { version = "0.20.1", features = [ "esp32c3", "embedded-hal", "embassy-futures" ] }
 esp-println = { version = "0.11.0", features = ["esp32c3", "log", "colors"] }
 log = { version = "0.4.21" }
 esp-alloc = { version = "0.4.0" }
 embedded-io = "0.6.1"
-esp-wifi = { version = "0.9.1", features = [
+esp-wifi = { version = "0.8.0", features = [
     "esp32c3",
-    "phy-enable-usb",
     "utils",
+    "smoltcp",
     "wifi",
+    "wifi-default",
+    "embedded-svc",
 ] }
 heapless = { version = "0.8.0", default-features = false }
 smoltcp = { version = "0.11.0", default-features = false, features = [
-    "medium-ethernet",
+    #"medium-ethernet",
     "proto-dhcpv4",
     "proto-igmp",
     "proto-ipv4",
@@ -34,7 +36,6 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
 embedded-hal = "1.0.0"
 ws2812-spi = "0.5.0"
 smart-leds = "0.4.0"
-esp32c3 = { version = "0.25.0", features = ["critical-section"] }
 
 [profile.dev]
 # Rust debug is too slow.
@@ -47,5 +48,6 @@ debug = 2
 debug-assertions = false
 incremental = false
 lto = 'fat'
-opt-level = 's'
+#opt-level = 's'
+opt-level = 3
 overflow-checks = false
