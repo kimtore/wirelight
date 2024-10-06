@@ -24,16 +24,6 @@ const LED_COUNT: usize = 60;
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 
-#[embassy_executor::task]
-async fn task() {
-    let mut i = 0;
-    loop {
-        i = i + 1;
-        log::info!("Task running [#{i}]...");
-        embassy_time::Timer::after_secs(1).await;
-    }
-}
-
 #[main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger(log::LevelFilter::Info);
@@ -52,11 +42,8 @@ async fn main(spawner: Spawner) {
     log::info!("Initializing embassy...");
     esp_hal_embassy::init(clocks, embassy_timer.timer0);
 
-    log::info!("Spawning bullshit task...");
-    spawner.must_spawn(task());
-    log::info!("Spawning WiFi task...");
+    spawner.must_spawn(ping_task());
     spawner.must_spawn(wifi_task(peripherals.TIMG1, peripherals.RNG, peripherals.RADIO_CLK, peripherals.WIFI, clocks));
-    log::info!("Spawning LED task...");
     spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks));
 
     loop {
@@ -72,7 +59,8 @@ async fn wifi_task(
     wifi: esp_hal::peripherals::WIFI,
     clocks: &'static Clocks<'static>,
 ) {
-    log::info!("Initializing WiFi configuration.");
+    log::info!("WiFi task started.");
+    log::debug!("Initializing WiFi configuration.");
 
     let wifi_timer = TimerGroup::new(wifi_timer, clocks);
     let wifi_init = esp_wifi::initialize(
@@ -81,17 +69,9 @@ async fn wifi_task(
         Rng::new(rng),
         radio_clk,
         &clocks,
-    );
+    ).unwrap();
 
-    match wifi_init {
-        Ok(_) => {}
-        Err(err) => {
-            log::info!("wifi setup error: {:?}", err);
-        }
-    }
-    let wifi_init = wifi_init.unwrap();
-
-    log::info!("Configuring WiFi for station mode.");
+    log::debug!("Configuring WiFi for station mode.");
 
     let wifi_config = esp_wifi::wifi::ClientConfiguration {
         ssid: WIFI_SSID.parse().unwrap(),
@@ -106,24 +86,32 @@ async fn wifi_task(
             wifi_config,
         ).unwrap();
 
-    log::info!("Starting WiFi controller.");
+    log::info!("Starting WiFi controller...");
 
     wifi_controller.start().await.unwrap();
 
-    log::info!("Connecting WiFi...");
-
-    match wifi_controller.connect().await {
-        Ok(_) => {
-            log::info!("WiFi connect success.");
+    loop {
+        if wifi_controller.is_connected().unwrap() {
+            embassy_time::Timer::after_millis(500).await;
+            continue;
         }
-        Err(err) => {
-            log::error!("WiFi connect error: {:?}", err);
+
+        log::info!("WiFi connecting...");
+
+        match wifi_controller.connect().await {
+            Ok(_) => {
+                log::info!("WiFi connect success.");
+            }
+            Err(err) => {
+                log::error!("WiFi connect error: {:?}", err);
+            }
         }
     }
 }
 
 #[embassy_executor::task]
 async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, clocks: &'static Clocks<'static>) {
+    log::info!("LED task started.");
     log::info!("Setting up DMA buffers.");
 
     let (
@@ -167,11 +155,28 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
             for val in 0..=255 {
                 let color = smart_leds::hsv::hsv2rgb(Hsv { hue, sat, val });
                 let data = [color; LED_COUNT];
-                critical_section::with(|_| {
-                    ws.write(data).unwrap();
-                });
+                    critical_section::with(|_| {
+                        ws.write(data).unwrap();
+                    });
+                //embassy_time::Timer::after_micros(1).await;
             }
             embassy_time::Timer::after_millis(50).await;
         }
+    }
+}
+
+#[embassy_executor::task]
+async fn ping_task() {
+    use esp_wifi::current_millis;
+
+    log::info!("Ping task started.");
+
+    let mut i = 0;
+    let mut millis = current_millis();
+    loop {
+        i = i + 1;
+        log::info!("Ping {i} +{}ms", current_millis()-millis);
+        millis = current_millis();
+        embassy_time::Timer::after_millis(500).await;
     }
 }
