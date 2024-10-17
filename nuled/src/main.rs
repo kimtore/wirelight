@@ -4,7 +4,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
-use esp_hal::dma::{DmaPriority};
+use esp_hal::dma::DmaPriority;
 use esp_hal::gpio::{GpioPin, Io};
 use esp_hal::peripherals::{Peripherals, SPI2};
 use esp_hal::prelude::*;
@@ -12,7 +12,8 @@ use esp_hal::riscv::_export::critical_section;
 use esp_hal::rng::Rng;
 use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
-use esp_hal::timer::timg::{TimerGroup};
+use esp_hal::timer::timg::TimerGroup;
+use esp_wifi::wifi::{WifiController};
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
@@ -42,8 +43,28 @@ async fn main(spawner: Spawner) {
     log::info!("Initializing embassy...");
     esp_hal_embassy::init(clocks, embassy_timer.timer0);
 
+    log::debug!("Initializing WiFi configuration...");
+
+    let wifi_timer = TimerGroup::new(peripherals.TIMG1, clocks);
+    let wifi_init = esp_wifi::initialize(
+        esp_wifi::EspWifiInitFor::Wifi,
+        wifi_timer.timer0,
+        Rng::new(peripherals.RNG),
+        peripherals.RADIO_CLK,
+        &clocks,
+    ).unwrap();
+
+    log::debug!("Configuring WiFi for station mode.");
+
+    let (_wifi_device, wifi_controller) =
+        esp_wifi::wifi::new_with_mode(
+            &wifi_init,
+            peripherals.WIFI,
+            esp_wifi::wifi::WifiStaDevice,
+        ).unwrap();
+
     spawner.must_spawn(ping_task());
-    spawner.must_spawn(wifi_task(peripherals.TIMG1, peripherals.RNG, peripherals.RADIO_CLK, peripherals.WIFI, clocks));
+    spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks));
 
     loop {
@@ -51,49 +72,39 @@ async fn main(spawner: Spawner) {
     }
 }
 
+/// https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/wifi_embassy_bench.rs
+#[embassy_executor::task]
+async fn net_task() {}
+
 #[embassy_executor::task]
 async fn wifi_task(
-    wifi_timer: esp_hal::peripherals::TIMG1,
-    rng: esp_hal::peripherals::RNG,
-    radio_clk: esp_hal::peripherals::RADIO_CLK,
-    wifi: esp_hal::peripherals::WIFI,
-    clocks: &'static Clocks<'static>,
+    mut wifi_controller: WifiController<'static>,
 ) {
+    use esp_wifi::wifi::*;
+    use embassy_time::Duration;
+    use embassy_time::Timer;
+
     log::info!("WiFi task started.");
-    log::debug!("Initializing WiFi configuration.");
-
-    let wifi_timer = TimerGroup::new(wifi_timer, clocks);
-    let wifi_init = esp_wifi::initialize(
-        esp_wifi::EspWifiInitFor::Wifi,
-        wifi_timer.timer0,
-        Rng::new(rng),
-        radio_clk,
-        &clocks,
-    ).unwrap();
-
-    log::debug!("Configuring WiFi for station mode.");
-
-    let wifi_config = esp_wifi::wifi::ClientConfiguration {
-        ssid: WIFI_SSID.parse().unwrap(),
-        password: WIFI_PASSWORD.parse().unwrap(),
-        auth_method: esp_wifi::wifi::AuthMethod::WPA2Personal,
-        ..Default::default()
-    };
-    let (_wifi_device, mut wifi_controller) =
-        esp_wifi::wifi::new_with_config::<esp_wifi::wifi::WifiStaDevice>(
-            &wifi_init,
-            wifi,
-            wifi_config,
-        ).unwrap();
-
-    log::info!("Starting WiFi controller...");
-
-    wifi_controller.start().await.unwrap();
 
     loop {
-        if wifi_controller.is_connected().unwrap() {
-            embassy_time::Timer::after_millis(500).await;
-            continue;
+        if let WifiState::StaConnected = get_wifi_state() {
+            // already connected.
+            // wait until we're no longer connected
+            wifi_controller.wait_for_event(WifiEvent::StaDisconnected).await;
+            Timer::after(Duration::from_millis(5000)).await
+        }
+
+        if !matches!(wifi_controller.is_started(), Ok(true)) {
+            let client_config = Configuration::Client(ClientConfiguration {
+                ssid: WIFI_SSID.try_into().unwrap(),
+                password: WIFI_PASSWORD.try_into().unwrap(),
+                auth_method: AuthMethod::WPA2Personal,
+                ..Default::default()
+            });
+            wifi_controller.set_configuration(&client_config).unwrap();
+            log::info!("Starting WiFi controller...");
+            wifi_controller.start().await.unwrap();
+            log::info!("WiFi started.");
         }
 
         log::info!("WiFi connecting...");
@@ -104,6 +115,7 @@ async fn wifi_task(
             }
             Err(err) => {
                 log::error!("WiFi connect error: {:?}", err);
+                Timer::after(Duration::from_millis(5000)).await;
             }
         }
     }
@@ -155,9 +167,9 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
             for val in 0..=255 {
                 let color = smart_leds::hsv::hsv2rgb(Hsv { hue, sat, val });
                 let data = [color; LED_COUNT];
-                    critical_section::with(|_| {
-                        ws.write(data).unwrap();
-                    });
+                critical_section::with(|_| {
+                    ws.write(data).unwrap();
+                });
                 //embassy_time::Timer::after_micros(1).await;
             }
             embassy_time::Timer::after_millis(50).await;
