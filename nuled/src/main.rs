@@ -16,7 +16,7 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
@@ -41,7 +41,7 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    log::info!("NULED booting.");
+    info!("NULED booting.");
 
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
@@ -52,10 +52,10 @@ async fn main(spawner: Spawner) {
 
     let embassy_timer = TimerGroup::new(peripherals.TIMG0, clocks);
 
-    log::info!("Initializing embassy...");
+    info!("Initializing embassy...");
     esp_hal_embassy::init(clocks, embassy_timer.timer0);
 
-    log::debug!("Initializing WiFi configuration...");
+    debug!("Initializing WiFi configuration...");
 
     let wifi_timer = TimerGroup::new(peripherals.TIMG1, clocks);
     let wifi_init = esp_wifi::initialize(
@@ -66,7 +66,7 @@ async fn main(spawner: Spawner) {
         &clocks,
     ).unwrap();
 
-    log::debug!("Configuring WiFi for station mode.");
+    debug!("Configuring WiFi for station mode.");
 
     let (wifi_interface, wifi_controller) =
         esp_wifi::wifi::new_with_mode(
@@ -172,7 +172,7 @@ async fn wifi_task(
     use embassy_time::Duration;
     use embassy_time::Timer;
 
-    log::info!("WiFi task started.");
+    info!("WiFi task started.");
 
     loop {
         if let WifiState::StaConnected = get_wifi_state() {
@@ -190,19 +190,19 @@ async fn wifi_task(
                 ..Default::default()
             });
             wifi_controller.set_configuration(&client_config).unwrap();
-            log::info!("Starting WiFi controller...");
+            info!("Starting WiFi controller...");
             wifi_controller.start().await.unwrap();
-            log::info!("WiFi started.");
+            info!("WiFi started.");
         }
 
-        log::info!("WiFi connecting...");
+        info!("WiFi connecting...");
 
         match wifi_controller.connect().await {
             Ok(_) => {
-                log::info!("WiFi connect success.");
+                info!("WiFi connect success.");
             }
             Err(err) => {
-                log::error!("WiFi connect error: {:?}", err);
+                error!("WiFi connect error: {:?}", err);
                 Timer::after(Duration::from_millis(5000)).await;
             }
         }
@@ -211,8 +211,8 @@ async fn wifi_task(
 
 #[embassy_executor::task]
 async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, clocks: &'static Clocks<'static>) {
-    log::info!("LED task started.");
-    log::info!("Setting up DMA buffers.");
+    info!("LED task started.");
+    info!("Setting up DMA buffers.");
 
     let (
         tx_buffer,
@@ -224,7 +224,7 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
     let tx_dma = esp_hal::dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
     let rx_dma = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    log::info!("Initializing SPI driver at 3.2MHz");
+    info!("Initializing SPI driver at 3.2MHz");
 
     let dma = esp_hal::dma::Dma::new(dma);
     let dma_channel_0 = dma.channel0.configure(true, DmaPriority::Priority9);
@@ -238,14 +238,14 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
         .with_dma(dma_channel_0)
         ;
 
-    log::info!("Initializing SPI DMA bus...");
+    info!("Initializing SPI DMA bus...");
 
     let spi_driver = esp_hal::spi::master::SpiDmaBus::new(spi, tx_dma, rx_dma);
 
     let mut led_buffer = [0_u8; (LED_COUNT * 12) + 40];
     let mut ws = Ws2812::new(spi_driver, &mut led_buffer);
 
-    log::info!("WS2812 driver started on SPI2 and GPIO8.");
+    info!("WS2812 driver started on SPI2 and GPIO8.");
 
     embassy_time::Timer::after_millis(1).await;
 
@@ -269,13 +269,13 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
 async fn ping_task() {
     use esp_wifi::current_millis;
 
-    log::info!("Ping task started.");
+    info!("Ping task started.");
 
     let mut i = 0;
     let mut millis = current_millis();
     loop {
         i = i + 1;
-        log::info!("Ping {i} +{}ms", current_millis()-millis);
+        info!("Ping {i} +{}ms", current_millis()-millis);
         millis = current_millis();
         embassy_time::Timer::after_millis(500).await;
     }
