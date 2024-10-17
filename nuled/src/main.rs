@@ -2,6 +2,8 @@
 #![no_main]
 
 use embassy_executor::Spawner;
+use embassy_net::IpListenEndpoint;
+use embassy_net::udp::{PacketMetadata};
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
 use esp_hal::dma::DmaPriority;
@@ -14,6 +16,7 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
+use log::{error, info, warn};
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
@@ -26,6 +29,13 @@ const LED_COUNT: usize = 60;
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
 static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
+
+const RX_BUFFER_SIZE: usize = 16384;
+const TX_BUFFER_SIZE: usize = 16384;
+static mut RX_METADATA_BUFFER: [PacketMetadata; 32] = [PacketMetadata::EMPTY; 32];
+static mut TX_METADATA_BUFFER: [PacketMetadata; 32] = [PacketMetadata::EMPTY; 32];
+static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
+static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -83,11 +93,70 @@ async fn main(spawner: Spawner) {
     spawner.must_spawn(ping_task());
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
+    spawner.must_spawn(udp_receive_task(network_stack));
     spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks));
 
     loop {
         embassy_time::Timer::after_secs(1).await;
     }
+}
+
+#[embassy_executor::task]
+async fn udp_receive_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
+    use embassy_net::udp::UdpSocket;
+    use embassy_time::Timer;
+
+    loop {
+        if !stack.is_link_up() {
+            warn!("Network is not up yet...");
+            Timer::after_secs(1).await;
+            continue;
+        }
+
+        let Some(config) = stack.config_v4() else {
+            warn!("Still waiting for IPv4 address...");
+            Timer::after_secs(1).await;
+            continue;
+        };
+
+
+        info!("Acquired IPv4 address {:?}", config.address);
+
+        let mut sock = UdpSocket::new(
+            stack,
+            unsafe { &mut *core::ptr::addr_of_mut!(RX_METADATA_BUFFER) },
+            unsafe { &mut *core::ptr::addr_of_mut!(RX_BUFFER) },
+            unsafe { &mut *core::ptr::addr_of_mut!(TX_METADATA_BUFFER) },
+            unsafe { &mut *core::ptr::addr_of_mut!(TX_BUFFER) },
+        );
+
+        if let Err(err) = sock.bind(IpListenEndpoint::from(56700)) {
+            error!("bind to port 56700: {:?}", err);
+            continue;
+        }
+
+        const RECV_BUF_SIZE: usize = 1024;
+        let mut data_receive_buffer: [u8; RECV_BUF_SIZE] = [0; RECV_BUF_SIZE];
+
+        loop {
+            match sock.recv_from(&mut data_receive_buffer).await {
+                Ok((length, endpoint)) => {
+                    info!("Received packet from {:?} of size {}", endpoint, length);
+                    let data = &data_receive_buffer[0..length];
+                    handle_udp_packet(data);
+                    sock.send_to(data, endpoint).await.unwrap();
+                }
+                Err(err) => {
+                    error!("error receiving UDP packet: {:?}", err);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn handle_udp_packet(data: &[u8]) {
+    info!("--> {:?}", data);
 }
 
 #[embassy_executor::task]
