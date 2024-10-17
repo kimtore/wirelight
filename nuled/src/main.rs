@@ -24,6 +24,8 @@ const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 const LED_COUNT: usize = 60;
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
+static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
+static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -56,15 +58,31 @@ async fn main(spawner: Spawner) {
 
     log::debug!("Configuring WiFi for station mode.");
 
-    let (_wifi_device, wifi_controller) =
+    let (wifi_interface, wifi_controller) =
         esp_wifi::wifi::new_with_mode(
             &wifi_init,
             peripherals.WIFI,
             esp_wifi::wifi::WifiStaDevice,
         ).unwrap();
 
+    let network_config = embassy_net::Config::dhcpv4(Default::default());
+
+    let seed = 1234; // very random, very secure seed
+
+    let stack_resources: &'static mut _ = NETWORK_STACK_MEMORY.init(embassy_net::StackResources::<3>::new());
+
+    let network_stack: &'static mut _ = NETWORK_STACK.init(
+        embassy_net::Stack::new(
+            wifi_interface,
+            network_config,
+            stack_resources,
+            seed,
+        )
+    );
+
     spawner.must_spawn(ping_task());
     spawner.must_spawn(wifi_task(wifi_controller));
+    spawner.must_spawn(net_task(network_stack));
     spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks));
 
     loop {
@@ -72,9 +90,10 @@ async fn main(spawner: Spawner) {
     }
 }
 
-/// https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/wifi_embassy_bench.rs
 #[embassy_executor::task]
-async fn net_task() {}
+async fn net_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
+    stack.run().await
+}
 
 #[embassy_executor::task]
 async fn wifi_task(
