@@ -25,6 +25,9 @@ const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 const MQTT_SERVER: &'static str = env!("NULED_MQTT_SERVER");
 const MQTT_PORT: u16 = 1883; //env!("NULED_MQTT_PORT");
+const MQTT_USERNAME: &'static str = env!("NULED_MQTT_USERNAME");
+const MQTT_PASSWORD: &'static str = env!("NULED_MQTT_PASSWORD");
+
 const LED_COUNT: usize = 60;
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
@@ -114,24 +117,27 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
 
     loop {
         if !stack.is_link_up() {
-            warn!("Network is not up yet...");
+            warn!("Waiting for network...");
             Timer::after_secs(1).await;
             continue;
         }
 
         let Some(config) = stack.config_v4() else {
-            warn!("Still waiting for IPv4 address...");
+            warn!("Waiting for IPv4 address...");
             Timer::after_secs(1).await;
             continue;
         };
 
 
-        info!("Acquired IPv4 address {:?}", config.address);
+        info!("Acquired IPv4 address {}", config.address);
 
-        let Ok(remote_ip) = stack.dns_query(MQTT_SERVER, dns::DnsQueryType::A).await.map(|x| x[0]) else {
-            warn!("DNS query failed for MQTT server, retrying in 30s...");
-            Timer::after_secs(30).await;
-            continue;
+        let mqtt_server_ip = match stack.dns_query(MQTT_SERVER, dns::DnsQueryType::A).await {
+            Err(err) => {
+                warn!("DNS query failed for {}, retrying in 30s: {:?}", MQTT_SERVER, err);
+                Timer::after_secs(30).await;
+                continue;
+            }
+            Ok(ips) => ips[0],
         };
 
         let mut sock = TcpSocket::new(
@@ -140,10 +146,17 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
             unsafe { &mut *core::ptr::addr_of_mut!(TX_BUFFER) },
         );
 
-        if let Err(err) = sock.connect((remote_ip, MQTT_PORT)).await {
+        sock.set_keep_alive(Some(embassy_time::Duration::from_secs(15)));
+
+        info!("Connecting to {} ({}) port {}...", MQTT_SERVER, mqtt_server_ip, MQTT_PORT);
+
+        if let Err(err) = sock.connect((mqtt_server_ip, MQTT_PORT)).await {
             error!("Unable to connect to MQTT at {}:{}: {:?}", MQTT_SERVER, MQTT_PORT, err);
+            Timer::after_secs(5).await;
             continue;
         };
+
+        info!("Connected to MQTT, authenticating...");
 
         const MQTT_BUFFER_SIZE: usize = 1024;
 
@@ -151,9 +164,13 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
             rust_mqtt::client::client_config::MqttVersion::MQTTv5,
             CountingRng(20000),
         );
+
+        config.add_username(MQTT_USERNAME);
+        config.add_password(MQTT_PASSWORD);
         config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
-        config.add_client_id("clientId-8rhWgBODCl");
+        config.add_client_id("ruled");
         config.max_packet_size = MQTT_BUFFER_SIZE as u32;
+
         let mut recv_buffer = [0; MQTT_BUFFER_SIZE];
         let mut write_buffer = [0; MQTT_BUFFER_SIZE];
 
@@ -161,21 +178,31 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
             MqttClient::<_, 5, _>::new(sock, &mut write_buffer, MQTT_BUFFER_SIZE, &mut recv_buffer, MQTT_BUFFER_SIZE, config);
 
         if let Err(err) = client.connect_to_broker().await {
-            error!("MQTT connection failed: {:?}", err);
+            error!("MQTT authentication failed: {:?}", err);
+            Timer::after_secs(5).await;
             continue;
         }
 
-        info!("Connected to MQTT at {}:{}", MQTT_SERVER, MQTT_PORT);
+        info!("MQTT authenticated.");
 
         if let Err(err) = client.subscribe_to_topic("led/pallet/color/set").await {
             error!("Unable to subscribe to {}: {:?}", "topic", err);
+            Timer::after_secs(5).await;
             continue;
         };
+
+        info!("MQTT subscribed.");
 
         loop {
             match client.receive_message().await {
                 Ok((topic, data)) => {
-                    info!("MQTT receive on {}: {:?}", topic, data)
+                    debug!("MQTT receive on {}: {:?}", topic, data);
+                    match SetRGBMessage::parse(data) {
+                        None => {}
+                        Some(rgb) => {
+                            info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
+                        }
+                    }
                 }
                 Err(err) => {
                     error!("MQTT receive packet error: {:?}", err);
@@ -183,6 +210,65 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
                 }
             }
         }
+    }
+}
+
+struct SetRGBMessage {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+impl SetRGBMessage {
+    fn parse_int_and_delimiter<'a>(mut iter: impl Iterator<Item=&'a u8>) -> Option<u8> {
+        use core::str::FromStr;
+        use heapless::String;
+        let mut number_string = String::<3>::new();
+
+        loop {
+            let char = match iter.next() {
+                None => None,
+                Some(c) if *c as char == ',' => None,
+                Some(c) => Some(*c as char),
+            };
+
+            match char {
+                None => {
+                    break;
+                }
+                Some(char) => {
+                    if let Err(_) = number_string.push(char) {
+                        return None;
+                    };
+                }
+            }
+        }
+
+        u8::from_str(number_string.as_str()).ok()
+    }
+
+    #[allow(dead_code)]
+    fn parse_int(data: &[u8]) -> Option<u8> {
+        use core::str::FromStr;
+        use heapless::String;
+        let number_string = data.iter()
+            .take(3)
+            .fold(
+                String::<3>::new(),
+                |mut acc, c| {
+                    acc.push(*c as char).unwrap();
+                    acc
+                },
+            );
+        u8::from_str(number_string.as_str()).ok()
+    }
+
+    fn parse(data: &[u8]) -> Option<Self> {
+        let mut iter = data.iter();
+        let r = Self::parse_int_and_delimiter(&mut iter)?;
+        let g = Self::parse_int_and_delimiter(&mut iter)?;
+        let b = Self::parse_int_and_delimiter(&mut iter)?;
+        Some(Self { r, g, b })
     }
 }
 
@@ -203,8 +289,6 @@ async fn wifi_task(
 
     loop {
         if let WifiState::StaConnected = get_wifi_state() {
-            // already connected.
-            // wait until we're no longer connected
             wifi_controller.wait_for_event(WifiEvent::StaDisconnected).await;
             Timer::after(Duration::from_millis(5000)).await
         }
