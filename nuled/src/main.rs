@@ -398,11 +398,10 @@ async fn led_task(
 
     info!("WS2812 driver started on SPI2 and GPIO8.");
 
-    embassy_time::Timer::after_millis(1).await;
 
     loop {
         let Some(command) = queue.dequeue() else {
-            embassy_time::Timer::after_millis(10).await;
+            embassy_time::Timer::after_millis(1).await;
             continue;
         };
 
@@ -410,6 +409,10 @@ async fn led_task(
             Command::Fill(rgb) => {
                 let color = smart_leds::RGB8::new(rgb.r, rgb.g, rgb.b);
                 let data = [color; LED_COUNT];
+                let data = smart_leds::brightness(
+                    smart_leds::gamma(data.iter().cloned()),
+                    127,
+                );
                 critical_section::with(|_| {
                     ws.write(data).unwrap();
                 });
