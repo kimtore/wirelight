@@ -104,7 +104,6 @@ async fn main(spawner: Spawner) {
 
     let (producer, consumer) = command_queue.split();
 
-    spawner.must_spawn(ping_task());
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
     spawner.must_spawn(mqtt_task(network_stack, producer));
@@ -416,21 +415,5 @@ async fn led_task(
                 });
             }
         }
-    }
-}
-
-#[embassy_executor::task]
-async fn ping_task() {
-    use esp_wifi::current_millis;
-
-    info!("Ping task started.");
-
-    let mut i = 0;
-    let mut millis = current_millis();
-    loop {
-        i = i + 1;
-        info!("Ping {} +{}ms", i, current_millis()-millis);
-        millis = current_millis();
-        embassy_time::Timer::after_millis(500).await;
     }
 }
