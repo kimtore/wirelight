@@ -3,6 +3,7 @@
 
 pub mod rust_mqtt;
 
+use core::fmt::Write;
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
@@ -16,6 +17,7 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
+use heapless::String;
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
@@ -114,6 +116,7 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
         client::{client::MqttClient, client_config::ClientConfig},
         utils::rng_generator::CountingRng,
     };
+    use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 
     loop {
         if !stack.is_link_up() {
@@ -193,33 +196,61 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
 
         info!("MQTT subscribed.");
 
+        let mut rgb;
+
         loop {
             match client.receive_message().await {
                 Ok((topic, data)) => {
                     debug!("MQTT receive on {}: {:?}", topic, data);
-                    match SetRGBMessage::parse(data) {
-                        None => {}
-                        Some(rgb) => {
-                            info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
-                        }
-                    }
+
+                    match RGB::parse(data) {
+                        None => { continue; }
+                        Some(value) => { rgb = value; }
+                    };
+                    info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
                 }
                 Err(err) => {
                     error!("MQTT receive packet error: {:?}", err);
                     break;
                 }
             }
+
+            let Some(rgb_string) = rgb.serialize() else {
+                error!("Cannot serialize RGB string from {:?}", rgb);
+                continue;
+            };
+
+            match client.send_message("led/pallet/color", rgb_string.as_bytes(), QualityOfService::QoS0, false).await {
+                Ok(_) => info!("Published state"),
+                Err(err) => {
+                    error!("MQTT error publishing state: {:?}", err);
+                    break;
+                }
+            };
         }
     }
 }
 
-struct SetRGBMessage {
+#[derive(Debug)]
+struct RGB {
     r: u8,
     g: u8,
     b: u8,
 }
 
-impl SetRGBMessage {
+impl Default for RGB {
+    fn default() -> Self {
+        Self { r: 0, g: 0, b: 0 }
+    }
+}
+
+impl RGB {
+    fn serialize(&self) -> Option<String<11>> {
+        let mut s = String::new();
+        write!(s, "{},{},{}", self.r, self.g, self.b).ok()?;
+        Some(s)
+    }
+
     fn parse_int_and_delimiter<'a>(mut iter: impl Iterator<Item=&'a u8>) -> Option<u8> {
         use core::str::FromStr;
         use heapless::String;
@@ -244,22 +275,6 @@ impl SetRGBMessage {
             }
         }
 
-        u8::from_str(number_string.as_str()).ok()
-    }
-
-    #[allow(dead_code)]
-    fn parse_int(data: &[u8]) -> Option<u8> {
-        use core::str::FromStr;
-        use heapless::String;
-        let number_string = data.iter()
-            .take(3)
-            .fold(
-                String::<3>::new(),
-                |mut acc, c| {
-                    acc.push(*c as char).unwrap();
-                    acc
-                },
-            );
         u8::from_str(number_string.as_str()).ok()
     }
 
