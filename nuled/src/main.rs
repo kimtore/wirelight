@@ -16,7 +16,6 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
-use log::{debug, error, info, warn};
 use smart_leds::hsv::Hsv;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
@@ -39,9 +38,9 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
 #[main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger(log::LevelFilter::Debug);
+    esp_println::logger::init_logger(log::LevelFilter::Info);
 
-    crate::info!("NULED booting.");
+    info!("NULED booting.");
 
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
@@ -52,10 +51,10 @@ async fn main(spawner: Spawner) {
 
     let embassy_timer = TimerGroup::new(peripherals.TIMG0, clocks);
 
-    crate::info!("Initializing embassy...");
+    info!("Initializing embassy...");
     esp_hal_embassy::init(clocks, embassy_timer.timer0);
 
-    crate::debug!("Initializing WiFi configuration...");
+    debug!("Initializing WiFi configuration...");
 
     let wifi_timer = TimerGroup::new(peripherals.TIMG1, clocks);
     let wifi_init = esp_wifi::initialize(
@@ -66,7 +65,7 @@ async fn main(spawner: Spawner) {
         &clocks,
     ).unwrap();
 
-    crate::debug!("Configuring WiFi for station mode.");
+    debug!("Configuring WiFi for station mode.");
 
     let (wifi_interface, wifi_controller) =
         esp_wifi::wifi::new_with_mode(
@@ -115,22 +114,22 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
 
     loop {
         if !stack.is_link_up() {
-            crate::warn!("Network is not up yet...");
+            warn!("Network is not up yet...");
             Timer::after_secs(1).await;
             continue;
         }
 
         let Some(config) = stack.config_v4() else {
-            crate::warn!("Still waiting for IPv4 address...");
+            warn!("Still waiting for IPv4 address...");
             Timer::after_secs(1).await;
             continue;
         };
 
 
-        crate::info!("Acquired IPv4 address {:?}", config.address);
+        info!("Acquired IPv4 address {:?}", config.address);
 
         let Ok(remote_ip) = stack.dns_query(MQTT_SERVER, dns::DnsQueryType::A).await.map(|x| x[0]) else {
-            crate::warn!("DNS query failed for MQTT server, retrying in 30s...");
+            warn!("DNS query failed for MQTT server, retrying in 30s...");
             Timer::after_secs(30).await;
             continue;
         };
@@ -142,7 +141,7 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
         );
 
         if let Err(err) = sock.connect((remote_ip, MQTT_PORT)).await {
-            crate::error!("Unable to connect to MQTT at {}:{}: {:?}", MQTT_SERVER, MQTT_PORT, err);
+            error!("Unable to connect to MQTT at {}:{}: {:?}", MQTT_SERVER, MQTT_PORT, err);
             continue;
         };
 
@@ -162,24 +161,24 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
             MqttClient::<_, 5, _>::new(sock, &mut write_buffer, MQTT_BUFFER_SIZE, &mut recv_buffer, MQTT_BUFFER_SIZE, config);
 
         if let Err(err) = client.connect_to_broker().await {
-            crate::error!("MQTT connection failed: {:?}", err);
+            error!("MQTT connection failed: {:?}", err);
             continue;
         }
 
-        crate::info!("Connected to MQTT at {}:{}", MQTT_SERVER, MQTT_PORT);
+        info!("Connected to MQTT at {}:{}", MQTT_SERVER, MQTT_PORT);
 
         if let Err(err) = client.subscribe_to_topic("led/pallet/color/set").await {
-            crate::error!("Unable to subscribe to {}: {:?}", "topic", err);
+            error!("Unable to subscribe to {}: {:?}", "topic", err);
             continue;
         };
 
         loop {
             match client.receive_message().await {
                 Ok((topic, data)) => {
-                    crate::info!("MQTT receive on {}: {:?}", topic, data)
+                    info!("MQTT receive on {}: {:?}", topic, data)
                 }
                 Err(err) => {
-                    crate::error!("MQTT receive packet error: {:?}", err);
+                    error!("MQTT receive packet error: {:?}", err);
                     break;
                 }
             }
@@ -200,7 +199,7 @@ async fn wifi_task(
     use embassy_time::Duration;
     use embassy_time::Timer;
 
-    crate::info!("WiFi task started.");
+    info!("WiFi task started.");
 
     loop {
         if let WifiState::StaConnected = get_wifi_state() {
@@ -218,16 +217,16 @@ async fn wifi_task(
                 ..Default::default()
             });
             wifi_controller.set_configuration(&client_config).unwrap();
-            crate::info!("Starting WiFi controller...");
+            info!("Starting WiFi controller...");
             wifi_controller.start().await.unwrap();
-            crate::info!("WiFi started.");
+            info!("WiFi started.");
         }
 
-        crate::info!("WiFi connecting...");
+        info!("WiFi connecting...");
 
         match wifi_controller.connect().await {
             Ok(_) => {
-                crate::info!("WiFi connect success.");
+                info!("WiFi connect success.");
             }
             Err(err) => {
                 let msg = match err {
@@ -236,7 +235,7 @@ async fn wifi_task(
                     WifiError::Disconnected => "disconnected",
                     WifiError::UnknownWifiMode => "unknown wifi mode",
                 };
-                crate::error!("WiFi connect error: {}", msg);
+                error!("WiFi connect error: {}", msg);
                 Timer::after(Duration::from_millis(5000)).await;
             }
         }
@@ -245,8 +244,8 @@ async fn wifi_task(
 
 #[embassy_executor::task]
 async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, clocks: &'static Clocks<'static>) {
-    crate::info!("LED task started.");
-    crate::info!("Setting up DMA buffers.");
+    info!("LED task started.");
+    info!("Setting up DMA buffers.");
 
     let (
         tx_buffer,
@@ -258,7 +257,7 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
     let tx_dma = esp_hal::dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
     let rx_dma = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    crate::info!("Initializing SPI driver at 3.2MHz");
+    info!("Initializing SPI driver at 3.2MHz");
 
     let dma = esp_hal::dma::Dma::new(dma);
     let dma_channel_0 = dma.channel0.configure(true, DmaPriority::Priority9);
@@ -272,14 +271,14 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
         .with_dma(dma_channel_0)
         ;
 
-    crate::info!("Initializing SPI DMA bus...");
+    info!("Initializing SPI DMA bus...");
 
     let spi_driver = esp_hal::spi::master::SpiDmaBus::new(spi, tx_dma, rx_dma);
 
     let mut led_buffer = [0_u8; (LED_COUNT * 12) + 40];
     let mut ws = Ws2812::new(spi_driver, &mut led_buffer);
 
-    crate::info!("WS2812 driver started on SPI2 and GPIO8.");
+    info!("WS2812 driver started on SPI2 and GPIO8.");
 
     embassy_time::Timer::after_millis(1).await;
 
@@ -303,13 +302,13 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
 async fn ping_task() {
     use esp_wifi::current_millis;
 
-    crate::info!("Ping task started.");
+    info!("Ping task started.");
 
     let mut i = 0;
     let mut millis = current_millis();
     loop {
         i = i + 1;
-        crate::info!("Ping {} +{}ms", i, current_millis()-millis);
+        info!("Ping {} +{}ms", i, current_millis()-millis);
         millis = current_millis();
         embassy_time::Timer::after_millis(500).await;
     }
