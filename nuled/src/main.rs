@@ -17,8 +17,7 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
-use heapless::String;
-use smart_leds::hsv::Hsv;
+use heapless::{spsc, String};
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
@@ -35,11 +34,16 @@ const LED_COUNT: usize = 60;
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
 static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
+static COMMAND_QUEUE: StaticCell<spsc::Queue::<Command, 4>> = StaticCell::new();
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
 static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
+
+enum Command {
+    Fill(RGB),
+}
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -94,11 +98,17 @@ async fn main(spawner: Spawner) {
         )
     );
 
+    let command_queue: &'static mut _ = COMMAND_QUEUE.init(
+        spsc::Queue::<Command, 4>::new()
+    );
+
+    let (producer, consumer) = command_queue.split();
+
     spawner.must_spawn(ping_task());
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
-    spawner.must_spawn(mqtt_task(network_stack));
-    spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks));
+    spawner.must_spawn(mqtt_task(network_stack, producer));
+    spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks, consumer));
 
     loop {
         embassy_time::Timer::after_secs(1).await;
@@ -106,7 +116,10 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
-async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
+async fn mqtt_task(
+    stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
+    mut queue: spsc::Producer<'static, Command, 4>,
+) {
     use embassy_net::tcp::TcpSocket;
     use embassy_time::Timer;
     use embassy_net::dns;
@@ -170,7 +183,7 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
 
         config.add_username(MQTT_USERNAME);
         config.add_password(MQTT_PASSWORD);
-        config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
+        config.add_max_subscribe_qos(QualityOfService::QoS1);
         config.add_client_id("ruled");
         config.max_packet_size = MQTT_BUFFER_SIZE as u32;
 
@@ -208,6 +221,7 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
                         Some(value) => { rgb = value; }
                     };
                     info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
+                    let _ = queue.enqueue(Command::Fill(rgb.clone()));
                 }
                 Err(err) => {
                     error!("MQTT receive packet error: {:?}", err);
@@ -231,7 +245,7 @@ async fn mqtt_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct RGB {
     r: u8,
     g: u8,
@@ -342,7 +356,13 @@ async fn wifi_task(
 }
 
 #[embassy_executor::task]
-async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, clocks: &'static Clocks<'static>) {
+async fn led_task(
+    spi: SPI2,
+    pin: GpioPin<8>,
+    dma: esp_hal::peripherals::DMA,
+    clocks: &'static Clocks<'static>,
+    mut queue: spsc::Consumer<'static, Command, 4>,
+) {
     info!("LED task started.");
     info!("Setting up DMA buffers.");
 
@@ -382,17 +402,19 @@ async fn led_task(spi: SPI2, pin: GpioPin<8>, dma: esp_hal::peripherals::DMA, cl
     embassy_time::Timer::after_millis(1).await;
 
     loop {
-        let sat = 255;
-        for hue in [0, 85, 170] {
-            for val in 0..=255 {
-                let color = smart_leds::hsv::hsv2rgb(Hsv { hue, sat, val });
+        let Some(command) = queue.dequeue() else {
+            embassy_time::Timer::after_millis(10).await;
+            continue;
+        };
+
+        match command {
+            Command::Fill(rgb) => {
+                let color = smart_leds::RGB8::new(rgb.r, rgb.g, rgb.b);
                 let data = [color; LED_COUNT];
                 critical_section::with(|_| {
                     ws.write(data).unwrap();
                 });
-                //embassy_time::Timer::after_micros(1).await;
             }
-            embassy_time::Timer::after_millis(50).await;
         }
     }
 }
