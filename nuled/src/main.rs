@@ -2,6 +2,7 @@
 #![no_main]
 
 pub mod rust_mqtt;
+pub mod led;
 
 use core::fmt::Write;
 use embassy_executor::Spawner;
