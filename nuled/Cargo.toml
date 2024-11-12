@@ -38,6 +38,7 @@ static_cell = "2.1.0"
 embassy-net = { version = "0.4.0", features = ["proto-ipv4", "medium-ethernet", "tcp", "log", "packet-trace", "dhcpv4", "dns"] }
 log = "0.4"
 rand_core = "0.6"
+static-box = "0.2.0"
 
 [features]
 log = []

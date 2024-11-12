@@ -1,11 +1,12 @@
 use heapless::String;
 use core::fmt::Write;
 
-struct Strip<const N: usize>([RGB; N]);
+pub struct Strip<const N: usize>(pub [RGB; N]);
 
-#[derive(Default)]
-struct Rainbow<const N: usize> {
-    seq_no: usize,
+impl<const N: usize> Strip<N> {
+    pub fn to_rgb8(self) -> [smart_leds::RGB8; N] {
+        self.0.map(|x| x.into())
+    }
 }
 
 impl<const N: usize> Default for Strip<N> {
@@ -20,16 +21,49 @@ impl<const N: usize> Strip<N> {
     }
 }
 
+/// Loop through all hues on maximum saturation and brightness.
+#[derive(Default)]
+pub struct Rainbow<const N: usize> {
+    seq_no: u8,
+}
+
 impl<const N: usize> Iterator for Rainbow<N> {
     type Item = Strip<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.seq_no += 1;
         Some(Strip::fill(HSV {
-            hue: (self.seq_no % N) as u8,
-            sat: 0,
-            val: 0,
+            hue: self.seq_no,
+            sat: 255,
+            val: 255,
         }))
+    }
+}
+
+/// Solid color.
+pub struct Solid<const N: usize> {
+    color: RGB,
+    finished: bool,
+}
+
+impl<const N: usize> Solid<N> {
+    pub fn new(color: RGB) -> Self {
+        Self {
+            color,
+            finished: false,
+        }
+    }
+}
+
+impl<const N: usize> Iterator for Solid<N> {
+    type Item = Strip<N>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+        self.finished = true;
+        Some(Strip::fill(self.color))
     }
 }
 
@@ -38,6 +72,16 @@ pub struct RGB {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+}
+
+impl Into<smart_leds::RGB8> for RGB {
+    fn into(self) -> smart_leds::RGB8 {
+        smart_leds::RGB8 {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+        }
+    }
 }
 
 impl RGB {
