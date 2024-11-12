@@ -4,7 +4,6 @@
 pub mod rust_mqtt;
 pub mod led;
 
-use core::fmt::Write;
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
@@ -18,10 +17,11 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::{WifiController};
-use heapless::{spsc, String};
+use heapless::{spsc};
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
+use crate::led::RGB;
 
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
@@ -242,62 +242,6 @@ async fn mqtt_task(
                 }
             };
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct RGB {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
-impl Default for RGB {
-    fn default() -> Self {
-        Self { r: 0, g: 0, b: 0 }
-    }
-}
-
-impl RGB {
-    fn serialize(&self) -> Option<String<11>> {
-        let mut s = String::new();
-        write!(s, "{},{},{}", self.r, self.g, self.b).ok()?;
-        Some(s)
-    }
-
-    fn parse_int_and_delimiter<'a>(mut iter: impl Iterator<Item=&'a u8>) -> Option<u8> {
-        use core::str::FromStr;
-        use heapless::String;
-        let mut number_string = String::<3>::new();
-
-        loop {
-            let char = match iter.next() {
-                None => None,
-                Some(c) if *c as char == ',' => None,
-                Some(c) => Some(*c as char),
-            };
-
-            match char {
-                None => {
-                    break;
-                }
-                Some(char) => {
-                    if let Err(_) = number_string.push(char) {
-                        return None;
-                    };
-                }
-            }
-        }
-
-        u8::from_str(number_string.as_str()).ok()
-    }
-
-    fn parse(data: &[u8]) -> Option<Self> {
-        let mut iter = data.iter();
-        let r = Self::parse_int_and_delimiter(&mut iter)?;
-        let g = Self::parse_int_and_delimiter(&mut iter)?;
-        let b = Self::parse_int_and_delimiter(&mut iter)?;
-        Some(Self { r, g, b })
     }
 }
 
