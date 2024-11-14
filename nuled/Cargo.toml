@@ -31,7 +31,7 @@ heapless = { version = "0.8.0", default-features = false }
 embedded-hal = "1.0.0"
 ws2812-spi = "0.5.0"
 smart-leds = "0.4.0"
-embassy-executor = { version = "0.6.0", features = ["arch-riscv32", "task-arena-size-8192"] }
+embassy-executor = { version = "0.6.0", features = ["arch-riscv32", "task-arena-size-32768"] }
 esp-hal-embassy = { version = "0.3.0", features = ["esp32c3", "executors", "integrated-timers"] }
 embassy-time = "0.3.2"
 static_cell = "2.1.0"
@@ -39,6 +39,7 @@ embassy-net = { version = "0.4.0", features = ["proto-ipv4", "medium-ethernet", 
 log = "0.4"
 rand_core = "0.6"
 static-box = "0.2.0"
+num-traits = { version = "0.2.19", default-features = false, features = ["libm"] }
 
 [features]
 log = []

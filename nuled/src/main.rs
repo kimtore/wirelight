@@ -47,6 +47,7 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 enum LedEffect {
     Fill(RGB),
     Rainbow,
+    Polyrhythm,
 }
 
 #[main]
@@ -108,7 +109,7 @@ async fn main(spawner: Spawner) {
 
     let (mut producer, consumer) = command_queue.split();
 
-    producer.enqueue(LedEffect::Rainbow).unwrap();
+    producer.enqueue(LedEffect::Polyrhythm).unwrap();
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
@@ -357,7 +358,7 @@ async fn led_task(
         };
 
         use static_box::Box;
-        let mut mem = [0_u8; 32];
+        let mut mem = [0_u8; 4096];
         let mut effect: Box<dyn Iterator<Item=Strip<LED_COUNT>>>;
         const BRIGHTNESS: u8 = 127;
 
@@ -369,6 +370,10 @@ async fn led_task(
             LedEffect::Rainbow => {
                 info!("Starting effect: RAINBOW");
                 effect = Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default());
+            }
+            LedEffect::Polyrhythm => {
+                info!("Starting effect: POLYRHYTHM");
+                effect = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::new());
             }
         }
 
