@@ -3,6 +3,7 @@
 
 pub mod rust_mqtt;
 pub mod led;
+pub mod color;
 
 use crate::led::{Strip, RGB};
 use embassy_executor::Spawner;

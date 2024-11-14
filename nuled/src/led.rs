@@ -116,17 +116,17 @@ fn float_to_u8(f: f32) -> u8 {
 /// Red, green, blue.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct RGB {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
 }
 
 impl Into<smart_leds::RGB8> for RGB {
     fn into(self) -> smart_leds::RGB8 {
         smart_leds::RGB8 {
-            r: self.r,
-            g: self.g,
-            b: self.b,
+            r: self.r.round() as u8,
+            g: self.g.round() as u8,
+            b: self.b.round() as u8,
         }
     }
 }
@@ -142,9 +142,9 @@ impl RGB {
     /// Parse a comma-separated value from OpenHAB.
     pub fn parse(data: &[u8]) -> Option<Self> {
         let mut iter = data.iter();
-        let r = Self::parse_int_and_delimiter(&mut iter)?;
-        let g = Self::parse_int_and_delimiter(&mut iter)?;
-        let b = Self::parse_int_and_delimiter(&mut iter)?;
+        let r = Self::parse_int_and_delimiter(&mut iter)? as f32;
+        let g = Self::parse_int_and_delimiter(&mut iter)? as f32;
+        let b = Self::parse_int_and_delimiter(&mut iter)? as f32;
         Some(Self { r, g, b })
     }
 
@@ -212,39 +212,39 @@ impl Into<RGB> for HSV {
         let t: u16 = v * (255 - (s * (255 - f)) / 255) / 255;
         match self.hue {
             0..=42 => RGB {
-                r: v as u8,
-                g: t as u8,
-                b: p as u8,
+                r: v as f32,
+                g: t as f32,
+                b: p as f32,
             },
             43..=84 => RGB {
-                r: q as u8,
-                g: v as u8,
-                b: p as u8,
+                r: q as f32,
+                g: v as f32,
+                b: p as f32,
             },
             85..=127 => RGB {
-                r: p as u8,
-                g: v as u8,
-                b: t as u8,
+                r: p as f32,
+                g: v as f32,
+                b: t as f32,
             },
             128..=169 => RGB {
-                r: p as u8,
-                g: q as u8,
-                b: v as u8,
+                r: p as f32,
+                g: q as f32,
+                b: v as f32,
             },
             170..=212 => RGB {
-                r: t as u8,
-                g: p as u8,
-                b: v as u8,
+                r: t as f32,
+                g: p as f32,
+                b: v as f32,
             },
             213..=254 => RGB {
-                r: v as u8,
-                g: p as u8,
-                b: q as u8,
+                r: v as f32,
+                g: p as f32,
+                b: q as f32,
             },
             255 => RGB {
-                r: v as u8,
-                g: t as u8,
-                b: p as u8,
+                r: v as f32,
+                g: t as f32,
+                b: p as f32,
             },
         }
     }
