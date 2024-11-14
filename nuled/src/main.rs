@@ -5,7 +5,7 @@ pub mod rust_mqtt;
 pub mod led;
 pub mod color;
 
-use crate::led::{Strip, RGB};
+use crate::led::{Strip};
 use embassy_executor::Spawner;
 use embassy_time::Duration;
 use esp_backtrace as _;
@@ -24,6 +24,7 @@ use heapless::spsc;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
+use crate::color::RGB;
 
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
