@@ -49,7 +49,7 @@ static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 enum LedEffect {
     Fill(RGB),
     Rainbow,
-    Polyrhythm,
+    Polyrhythm(RGB, RGB),
 }
 
 #[main]
@@ -111,7 +111,7 @@ async fn main(spawner: Spawner) {
 
     let (mut producer, consumer) = command_queue.split();
 
-    producer.enqueue(LedEffect::Polyrhythm).unwrap();
+    producer.enqueue(LedEffect::Rainbow).unwrap();
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
@@ -231,7 +231,12 @@ async fn mqtt_task(
                         Some(value) => { rgb = value; }
                     };
                     info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
-                    let _ = queue.enqueue(LedEffect::Fill(rgb.clone()));
+                    let start_color = RGB{
+                        r: 0.0,
+                        g: 0.0,
+                        b: 255.0,
+                    };
+                    let _ = queue.enqueue(LedEffect::Polyrhythm(start_color, rgb.clone()));
                 }
                 Err(err) => {
                     error!("MQTT receive packet error: {:?}", err);
@@ -373,20 +378,21 @@ async fn led_task(
                 info!("Starting effect: RAINBOW");
                 effect = Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default());
             }
-            LedEffect::Polyrhythm => {
+            LedEffect::Polyrhythm(start, end) => {
                 info!("Starting effect: POLYRHYTHM");
-                effect = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::new());
+                effect = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::new(start, end));
             }
         }
 
         // Run the current effect until it is exhausted, or the user has requested a new effect.
         while let Some(strip) = effect.next() {
             let data = strip.to_rgb8();
+
             let data = smart_leds::brightness(
-                //smart_leds::gamma(data.iter().cloned()),
-                data.iter().cloned(),
+                smart_leds::gamma(data.iter().cloned()),
                 BRIGHTNESS,
             );
+
             critical_section::with(|_| {
                 ws.write(data).unwrap();
             });

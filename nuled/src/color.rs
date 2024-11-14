@@ -62,6 +62,7 @@ impl RGB {
 
 impl From<XYZ> for RGB {
     fn from(xyz: XYZ) -> Self {
+        // not verified...
         let r = 3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z;
         let g = -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z;
         let b = 0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z;
@@ -169,16 +170,29 @@ pub struct XYZ {
     z: f32,
 }
 
+// Constants for D65 white point
+const X_REF: f32 = 95.047;
+const Y_REF: f32 = 100.0;
+const Z_REF: f32 = 108.883;
+
+// XYZ/LUV conversion
+const K: f32 = 24389.0 / 27.0;
+const E: f32 = 216.0 / 24389.0;
+const U_PRIME_REF: f32 = 4.0 * X_REF / (X_REF + 15.0 * Y_REF + 3.0 * Z_REF);
+const V_PRIME_REF: f32 = 9.0 * Y_REF / (X_REF + 15.0 * Y_REF + 3.0 * Z_REF);
+
 impl From<RGB> for XYZ {
     fn from(rgb: RGB) -> Self {
         let r = srgb_to_linear(rgb.r / 255.0);
         let g = srgb_to_linear(rgb.g / 255.0);
         let b = srgb_to_linear(rgb.b / 255.0);
 
+        // Based on sRGB Working Space Matrix
+        // http://www.brucelindbloom.com/Eqn_RGB_XYZ_Matrix.html
         Self {
-            x: r * 41.24 + g * 35.76 + b * 18.05,
-            y: r * 21.26 + g * 71.52 + b * 7.22,
-            z: r * 1.93 + g * 11.92 + b * 95.05,
+            x: r * 0.4124564 + g * 0.3575761 + b * 0.1804375,
+            y: r * 0.2126729 + g * 0.7151522 + b * 0.0721750,
+            z: r * 0.0193339 + g * 0.1191920 + b * 0.9503041,
         }
     }
 }
@@ -193,9 +207,9 @@ impl From<CIELUV> for XYZ {
         let v_prime = cieluv.v / (13.0 * cieluv.l) + 0.46831999493879;
 
         let y = if cieluv.l > 8.0 {
-            YN * ((cieluv.l + 16.0) / 116.0).powi(3)
+            Y_REF * ((cieluv.l + 16.0) / 116.0).powi(3)
         } else {
-            YN * cieluv.l / 903.3
+            Y_REF * cieluv.l / 903.3
         };
 
         let x = y * 9.0 * u_prime / (4.0 * v_prime);
@@ -225,21 +239,27 @@ impl CIELUV {
 }
 
 impl From<XYZ> for CIELUV {
+    // Verified here: http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_Luv.html
+    // Introduced constants due to http://www.brucelindbloom.com/LContinuity.html
     fn from(xyz: XYZ) -> Self {
+        if xyz.x == 0.0 && xyz.y == 0.0 && xyz.z == 0.0 {
+            return Self { l: 0.0, u: 0.0, v: 0.0 };
+        }
+
         let u_prime = 4.0 * xyz.x / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
         let v_prime = 9.0 * xyz.y / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
 
-        let y_ratio = xyz.y / YN;
-        let l = if y_ratio > 0.008856 {
-            116.0 * y_ratio.powf(1.0 / 3.0) - 16.0
+        let y_ref = xyz.y / Y_REF;
+        let l = if y_ref > E {
+            116.0 * y_ref.powf(1.0 / 3.0) - 16.0
         } else {
-            903.3 * y_ratio
+            K * y_ref
         };
 
         Self {
             l,
-            u: 13.0 * l * (u_prime - 0.19783000664283),
-            v: 13.0 * l * (v_prime - 0.46831999493879),
+            u: 13.0 * l * (u_prime - U_PRIME_REF),
+            v: 13.0 * l * (v_prime - V_PRIME_REF),
         }
     }
 }
@@ -250,17 +270,13 @@ impl From<RGB> for CIELUV {
     }
 }
 
-// Constants for D65 white point
-//const XN: f32 = 95.047;
-const YN: f32 = 100.0;
-//const ZN: f32 = 108.883;
-
 /// Helper function to perform linear interpolation
 fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
 }
 
-/// Convert sRGB to linear RGB
+/// Convert sRGB to linear RGB (inverse sRGB companding)
+/// Verified here: http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
 fn srgb_to_linear(c: f32) -> f32 {
     if c <= 0.04045 {
         c / 12.92
@@ -270,6 +286,7 @@ fn srgb_to_linear(c: f32) -> f32 {
 }
 
 /// Convert linear RGB to sRGB
+/// Verified here: http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_RGB.html
 fn linear_to_srgb(c: f32) -> f32 {
     if c <= 0.0031308 {
         12.92 * c

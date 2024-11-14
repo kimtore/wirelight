@@ -1,5 +1,5 @@
 use num_traits::float::Float;
-use crate::color::{CIELUV, HSV, RGB};
+use crate::color::{CIELUV, HSV, RGB, XYZ};
 
 pub struct Strip<const N: usize>(pub [RGB; N]);
 
@@ -76,17 +76,27 @@ pub struct Polyrhythm<const N: usize> {
 }
 
 impl<const N: usize> Polyrhythm<N> {
-    pub fn new() -> Self {
+    pub fn new(start_color: RGB, end_color: RGB) -> Self {
         const FRAC: f32 = core::f32::consts::TAU / (360.0 * 6.0);
         let mut spinners = [Spinner::default(); N];
         for i in 0..N {
             spinners[i].angle = FRAC * i as f32;
             spinners[i].angular_velocity = FRAC * ((i + 1) as f32);
         }
+        debug!("Color 1 RGB: {start_color:?}");
+        debug!("Color 2 RGB: {end_color:?}");
+        let start_color: XYZ = start_color.into();
+        let end_color: XYZ = end_color.into();
+        debug!("Color 1 XYZ: {start_color:?}");
+        debug!("Color 2 XYZ: {end_color:?}");
+        let start_color = start_color.into();
+        let end_color = end_color.into();
+        debug!("Color 1 CIELUV: {start_color:?}");
+        debug!("Color 2 CIELUV: {end_color:?}");
         Self {
             spinners,
-            start_color: RGB{r: 0.0, g: 0.0, b: 0.0}.into(),
-            end_color: RGB{r: 0.0, g: 255.0, b: 255.0}.into(),
+            start_color,
+            end_color,
         }
     }
 }
@@ -97,18 +107,14 @@ impl<const N: usize> Iterator for Polyrhythm<N> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut strip = Strip::<N>::default();
         for i in 0..N {
-            self.spinners[i].increment();
             // translate the range from -1.0..1.0 to 0.0..1.0.
             let amplitude = (1.0 + self.spinners[i].amplitude()) / 2.0;
-            /*
-            strip.0[i] = HSV {
-                hue: 200,
-                sat: 255,
-                val: float_to_u8(amplitude),
-    (f * 255.0) as u8
-            }.into();
-             */
-            strip.0[i] = self.start_color.interpolate(self.end_color, amplitude).into();
+            let interpolated = self.start_color.interpolate(self.end_color, amplitude);
+            if i == 0 {
+                debug!("Polyrhythm: {amplitude:.5} -> {:?}", interpolated);
+            }
+            strip.0[i] = interpolated.into();
+            self.spinners[i].increment();
         }
 
         Some(strip)
