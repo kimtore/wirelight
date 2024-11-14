@@ -1,5 +1,5 @@
 use num_traits::float::Float;
-use crate::color::{HSV, RGB};
+use crate::color::{CIELUV, HSV, RGB};
 
 pub struct Strip<const N: usize>(pub [RGB; N]);
 
@@ -71,6 +71,8 @@ impl<const N: usize> Iterator for Solid<N> {
 /// Each LED has a progressively smaller period size.
 pub struct Polyrhythm<const N: usize> {
     spinners: [Spinner; N],
+    start_color: CIELUV,
+    end_color: CIELUV,
 }
 
 impl<const N: usize> Polyrhythm<N> {
@@ -83,6 +85,8 @@ impl<const N: usize> Polyrhythm<N> {
         }
         Self {
             spinners,
+            start_color: RGB{r: 0.0, g: 0.0, b: 0.0}.into(),
+            end_color: RGB{r: 0.0, g: 255.0, b: 255.0}.into(),
         }
     }
 }
@@ -96,20 +100,21 @@ impl<const N: usize> Iterator for Polyrhythm<N> {
             self.spinners[i].increment();
             // translate the range from -1.0..1.0 to 0.0..1.0.
             let amplitude = (1.0 + self.spinners[i].amplitude()) / 2.0;
+            /*
             strip.0[i] = HSV {
                 hue: 200,
                 sat: 255,
                 val: float_to_u8(amplitude),
+    (f * 255.0) as u8
             }.into();
+             */
+            strip.0[i] = self.start_color.interpolate(self.end_color, amplitude).into();
         }
 
         Some(strip)
     }
 }
 
-fn float_to_u8(f: f32) -> u8 {
-    (f * 255.0) as u8
-}
 #[derive(Debug, Clone, Copy, Default)]
 struct Spinner {
     angular_velocity: f32,

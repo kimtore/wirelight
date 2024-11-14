@@ -383,7 +383,8 @@ async fn led_task(
         while let Some(strip) = effect.next() {
             let data = strip.to_rgb8();
             let data = smart_leds::brightness(
-                smart_leds::gamma(data.iter().cloned()),
+                //smart_leds::gamma(data.iter().cloned()),
+                data.iter().cloned(),
                 BRIGHTNESS,
             );
             critical_section::with(|_| {

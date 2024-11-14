@@ -13,16 +13,6 @@ pub struct RGB {
     pub b: f32,
 }
 
-impl Into<smart_leds::RGB8> for RGB {
-    fn into(self) -> smart_leds::RGB8 {
-        smart_leds::RGB8 {
-            r: self.r.round() as u8,
-            g: self.g.round() as u8,
-            b: self.b.round() as u8,
-        }
-    }
-}
-
 impl RGB {
     /// Produce a comma-separated value, suitable for OpenHAB.
     pub fn serialize(&self) -> Option<String<11>> {
@@ -67,6 +57,36 @@ impl RGB {
         }
 
         u8::from_str(number_string.as_str()).ok()
+    }
+}
+
+impl From<XYZ> for RGB {
+    fn from(xyz: XYZ) -> Self {
+        let r = 3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z;
+        let g = -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z;
+        let b = 0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z;
+
+        Self {
+            r: (linear_to_srgb(r) * 255.0).max(0.0).min(255.0),
+            g: (linear_to_srgb(g) * 255.0).max(0.0).min(255.0),
+            b: (linear_to_srgb(b) * 255.0).max(0.0).min(255.0),
+        }
+    }
+}
+
+impl From<CIELUV> for RGB {
+    fn from(cieluv: CIELUV) -> Self {
+        XYZ::from(cieluv).into()
+    }
+}
+
+impl Into<smart_leds::RGB8> for RGB {
+    fn into(self) -> smart_leds::RGB8 {
+        smart_leds::RGB8 {
+            r: self.r.round() as u8,
+            g: self.g.round() as u8,
+            b: self.b.round() as u8,
+        }
     }
 }
 
@@ -143,23 +163,97 @@ impl Into<RGB> for HSV {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct XYZ {
+pub struct XYZ {
     x: f32,
     y: f32,
     z: f32,
 }
 
+impl From<RGB> for XYZ {
+    fn from(rgb: RGB) -> Self {
+        let r = srgb_to_linear(rgb.r / 255.0);
+        let g = srgb_to_linear(rgb.g / 255.0);
+        let b = srgb_to_linear(rgb.b / 255.0);
+
+        Self {
+            x: r * 41.24 + g * 35.76 + b * 18.05,
+            y: r * 21.26 + g * 71.52 + b * 7.22,
+            z: r * 1.93 + g * 11.92 + b * 95.05,
+        }
+    }
+}
+
+impl From<CIELUV> for XYZ {
+    fn from(cieluv: CIELUV) -> Self {
+        if cieluv.l == 0.0 {
+            return XYZ { x: 0.0, y: 0.0, z: 0.0 };
+        }
+
+        let u_prime = cieluv.u / (13.0 * cieluv.l) + 0.19783000664283;
+        let v_prime = cieluv.v / (13.0 * cieluv.l) + 0.46831999493879;
+
+        let y = if cieluv.l > 8.0 {
+            YN * ((cieluv.l + 16.0) / 116.0).powi(3)
+        } else {
+            YN * cieluv.l / 903.3
+        };
+
+        let x = y * 9.0 * u_prime / (4.0 * v_prime);
+        let z = y * (12.0 - 3.0 * u_prime - 20.0 * v_prime) / (4.0 * v_prime);
+
+        XYZ { x, y, z }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-struct CIELUV {
+pub struct CIELUV {
     l: f32,
     u: f32,
     v: f32,
 }
 
+impl CIELUV {
+    /// Interpolate between two CIELUV colors based on a parameter `t` (0.0 to 1.0).
+    /// `t = 0.0` returns the start color, `t = 1.0` returns the end color.
+    pub fn interpolate(&self, end: Self, t: f32) -> Self {
+        Self {
+            l: lerp(self.l, end.l, t),
+            u: lerp(self.u, end.u, t),
+            v: lerp(self.v, end.v, t),
+        }
+    }
+}
+
+impl From<XYZ> for CIELUV {
+    fn from(xyz: XYZ) -> Self {
+        let u_prime = 4.0 * xyz.x / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
+        let v_prime = 9.0 * xyz.y / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
+
+        let y_ratio = xyz.y / YN;
+        let l = if y_ratio > 0.008856 {
+            116.0 * y_ratio.powf(1.0 / 3.0) - 16.0
+        } else {
+            903.3 * y_ratio
+        };
+
+        Self {
+            l,
+            u: 13.0 * l * (u_prime - 0.19783000664283),
+            v: 13.0 * l * (v_prime - 0.46831999493879),
+        }
+    }
+}
+
+impl From<RGB> for CIELUV {
+    fn from(rgb: RGB) -> Self {
+        XYZ::from(rgb).into()
+    }
+}
+
 // Constants for D65 white point
-const XN: f32 = 95.047;
+//const XN: f32 = 95.047;
 const YN: f32 = 100.0;
-const ZN: f32 = 108.883;
+//const ZN: f32 = 108.883;
 
 /// Helper function to perform linear interpolation
 fn lerp(start: f32, end: f32, t: f32) -> f32 {
@@ -182,103 +276,4 @@ fn linear_to_srgb(c: f32) -> f32 {
     } else {
         1.055 * c.powf(1.0 / 2.4) - 0.055
     }
-}
-
-/// Convert RGB to XYZ
-fn rgb_to_xyz(rgb: RGB) -> XYZ {
-    let r = srgb_to_linear(rgb.r / 255.0);
-    let g = srgb_to_linear(rgb.g / 255.0);
-    let b = srgb_to_linear(rgb.b / 255.0);
-
-    XYZ {
-        x: r * 41.24 + g * 35.76 + b * 18.05,
-        y: r * 21.26 + g * 71.52 + b * 7.22,
-        z: r * 1.93 + g * 11.92 + b * 95.05,
-    }
-}
-
-/// Convert XYZ to RGB
-fn xyz_to_rgb(xyz: XYZ) -> RGB {
-    let r = 3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z;
-    let g = -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z;
-    let b = 0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z;
-
-    RGB {
-        r: (linear_to_srgb(r) * 255.0).max(0.0).min(255.0),
-        g: (linear_to_srgb(g) * 255.0).max(0.0).min(255.0),
-        b: (linear_to_srgb(b) * 255.0).max(0.0).min(255.0),
-    }
-}
-
-/// Convert XYZ to CIELUV
-fn xyz_to_cieluv(xyz: XYZ) -> CIELUV {
-    let u_prime = 4.0 * xyz.x / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
-    let v_prime = 9.0 * xyz.y / (xyz.x + 15.0 * xyz.y + 3.0 * xyz.z);
-
-    let y_ratio = xyz.y / YN;
-    let l = if y_ratio > 0.008856 {
-        116.0 * y_ratio.powf(1.0 / 3.0) - 16.0
-    } else {
-        903.3 * y_ratio
-    };
-
-    CIELUV {
-        l,
-        u: 13.0 * l * (u_prime - 0.19783000664283),
-        v: 13.0 * l * (v_prime - 0.46831999493879),
-    }
-}
-
-/// Convert CIELUV to XYZ
-fn cieluv_to_xyz(cieluv: CIELUV) -> XYZ {
-    if cieluv.l == 0.0 {
-        return XYZ { x: 0.0, y: 0.0, z: 0.0 };
-    }
-
-    let u_prime = cieluv.u / (13.0 * cieluv.l) + 0.19783000664283;
-    let v_prime = cieluv.v / (13.0 * cieluv.l) + 0.46831999493879;
-
-    let y = if cieluv.l > 8.0 {
-        YN * ((cieluv.l + 16.0) / 116.0).powi(3)
-    } else {
-        YN * cieluv.l / 903.3
-    };
-
-    let x = y * 9.0 * u_prime / (4.0 * v_prime);
-    let z = y * (12.0 - 3.0 * u_prime - 20.0 * v_prime) / (4.0 * v_prime);
-
-    XYZ { x, y, z }
-}
-
-/// Interpolate between two CIELUV colors based on a parameter `t` (0.0 to 1.0).
-/// `t = 0.0` returns the start color, `t = 1.0` returns the end color.
-pub fn interpolate_cieluv(start: CIELUV, end: CIELUV, t: f32) -> CIELUV {
-    CIELUV {
-        l: lerp(start.l, end.l, t),
-        u: lerp(start.u, end.u, t),
-        v: lerp(start.v, end.v, t),
-    }
-}
-
-/// Create a gradient of `n` colors between two RGB colors in CIELUV space
-pub fn cieluv_gradient<const N: usize>(start: RGB, end: RGB) -> [RGB; N] {
-    let start_xyz = rgb_to_xyz(start);
-    let end_xyz = rgb_to_xyz(end);
-
-    let start_luv = xyz_to_cieluv(start_xyz);
-    let end_luv = xyz_to_cieluv(end_xyz);
-    let mut result= [RGB::default(); N];
-
-    for i in 0..N {
-        let t = i as f32 / (N - 1) as f32;
-        let interpolated_luv = CIELUV {
-            l: lerp(start_luv.l, end_luv.l, t),
-            u: lerp(start_luv.u, end_luv.u, t),
-            v: lerp(start_luv.v, end_luv.v, t),
-        };
-        let interpolated_xyz = cieluv_to_xyz(interpolated_luv);
-        result[i] = xyz_to_rgb(interpolated_xyz);
-    }
-
-    result
 }
