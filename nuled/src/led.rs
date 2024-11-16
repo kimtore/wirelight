@@ -48,7 +48,7 @@ impl<const N: usize> Default for Rainbow<N> {
     fn default() -> Self {
         Self {
             degrees: 0.0,
-            degree_velocity: 0.5,
+            degree_velocity: ONE_DEGREE_RAD * 30.0,
         }
     }
 }
@@ -64,6 +64,9 @@ impl<const N: usize> Iterator for Rainbow<N> {
     fn next(&mut self) -> Option<Self::Item> {
         let color = HCL { h: self.degrees, c: 0.75, l: 0.5 };
         self.degrees += self.degree_velocity;
+        //let color = color.to_rgb_fast();
+        //let rgb_color: RGB = color.into();
+        //info!("{color:?} -> {rgb_color:?}");
         Some(Strip::fill(color))
     }
 }
