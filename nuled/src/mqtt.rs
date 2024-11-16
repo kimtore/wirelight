@@ -15,6 +15,7 @@ use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::packet::v5::publish_packet::QualityOfService::*;
 use crate::rust_mqtt::client::client_config::MqttVersion;
 use core::fmt::Write as _;
+use core::str::FromStr;
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
@@ -41,6 +42,11 @@ impl MqttMessage<'_> {
             "polyrhythm" => Some(Effect::Polyrhythm),
             _ => None,
         }
+    }
+
+    fn parse_float(&self) -> Option<f32> {
+        let s = core::str::from_utf8(self.0).ok()?;
+        f32::from_str(s).ok()
     }
 
     /// Produce a comma-separated value, suitable for OpenHAB.
@@ -224,11 +230,15 @@ where
     match topic {
         "led/pallet/color1/set" => {
             state.led_effect_params.color1 = message.parse_rgb().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
         }
         "led/pallet/color2/set" => {
             state.led_effect_params.color2 = message.parse_rgb().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
+        }
+        "led/pallet/chroma/set" => {
+            state.led_effect_params.chroma = message.parse_float().ok_or(ParseParameter)?;
+        }
+        "led/pallet/luminance/set" => {
+            state.led_effect_params.luminance = message.parse_float().ok_or(ParseParameter)?;
         }
         "led/pallet/effect/set" => {
             state.effect = message.parse_effect().ok_or(ParseParameter)?;
@@ -237,7 +247,8 @@ where
         _ => return Err(InvalidTopic)
     };
 
-    info!("Received new parameters: {:?}", state);
+    let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
+    info!("Update: {:?}", state);
 
     client.send_message(
         "led/pallet/color1",
@@ -257,6 +268,20 @@ where
         "led/pallet/effect",
         state.effect
             .serialize()
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    let mut buf = ryu::Buffer::new();
+
+    client.send_message(
+        "led/pallet/chroma",
+        buf.format(state.led_effect_params.chroma)
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    client.send_message(
+        "led/pallet/luminance",
+        buf.format(state.led_effect_params.luminance)
             .as_bytes(), QoS0, false,
     ).await.map_err(MqttPublish)?;
 

@@ -6,12 +6,28 @@ use crate::color::{CIELUV, HCL, RGB};
 const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
 
 /// Global LED params.
-/// To make the OpenHAB API extremely simple, we define a set of common parameters
-/// that effects must take.
-#[derive(Default, Copy, Clone, Debug)]
+///
+/// To make the OpenHAB API extremely simple, we define a set of common parameters.
+/// Effects may use as many as these as they need.
+#[derive(Copy, Clone, Debug)]
 pub struct LedEffectParams {
     pub color1: RGB,
     pub color2: RGB,
+    pub speed: f32,
+    pub chroma: f32,
+    pub luminance: f32,
+}
+
+impl Default for LedEffectParams {
+    fn default() -> Self {
+        Self {
+            color1: RGB::default(),
+            color2: RGB::default(),
+            speed: 1.0,
+            chroma: 0.75,
+            luminance: 0.5,
+        }
+    }
 }
 
 pub trait LedEffect<const N: usize>: Iterator<Item=Strip<N>> {
@@ -40,6 +56,8 @@ impl<const N: usize> Strip<N> {
 
 /// Loop through all hues on maximum saturation and brightness.
 pub struct Rainbow<const N: usize> {
+    chroma: f32,
+    luminance: f32,
     degrees: f32,
     degree_velocity: f32,
 }
@@ -47,6 +65,8 @@ pub struct Rainbow<const N: usize> {
 impl<const N: usize> Default for Rainbow<N> {
     fn default() -> Self {
         Self {
+            chroma: 0.0,
+            luminance: 0.0,
             degrees: 0.0,
             degree_velocity: ONE_DEGREE_RAD * 30.0,
         }
@@ -54,7 +74,10 @@ impl<const N: usize> Default for Rainbow<N> {
 }
 
 impl<const N: usize> LedEffect<N> for Rainbow<N> {
-    fn configure(&mut self, _params: LedEffectParams) {}
+    fn configure(&mut self, params: LedEffectParams) {
+        self.chroma = params.chroma;
+        self.luminance = params.luminance;
+    }
 }
 
 impl<const N: usize> Iterator for Rainbow<N> {
@@ -62,7 +85,7 @@ impl<const N: usize> Iterator for Rainbow<N> {
 
     /// Circle through the HCL color space for rainbow colors.
     fn next(&mut self) -> Option<Self::Item> {
-        let color = HCL { h: self.degrees, c: 0.75, l: 0.5 };
+        let color = HCL { h: self.degrees, c: self.chroma, l: self.luminance };
         self.degrees += self.degree_velocity;
         //let color = color.to_rgb_fast();
         //let rgb_color: RGB = color.into();
