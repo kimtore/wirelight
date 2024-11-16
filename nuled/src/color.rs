@@ -219,7 +219,7 @@ impl From<CIELUV> for XYZ {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct CIELUV {
     l: f32,
     u: f32,

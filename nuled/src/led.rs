@@ -1,5 +1,18 @@
 use num_traits::float::Float;
-use crate::color::{CIELUV, HSV, RGB, XYZ};
+use crate::color::{CIELUV, HSV, RGB};
+
+/// Global LED params.
+/// To make the OpenHAB API extremely simple, we define a set of common parameters
+/// that effects must take.
+#[derive(Default, Copy, Clone, Debug)]
+pub struct LedEffectParams {
+    pub color1: RGB,
+    pub color2: RGB,
+}
+
+pub trait LedEffect<const N: usize>: Iterator<Item=Strip<N>> {
+    fn configure(&mut self, params: LedEffectParams);
+}
 
 pub struct Strip<const N: usize>(pub [RGB; N]);
 
@@ -27,6 +40,10 @@ pub struct Rainbow<const N: usize> {
     seq_no: u8,
 }
 
+impl<const N: usize> LedEffect<N> for Rainbow<N> {
+    fn configure(&mut self, _params: LedEffectParams) {}
+}
+
 impl<const N: usize> Iterator for Rainbow<N> {
     type Item = Strip<N>;
 
@@ -41,6 +58,7 @@ impl<const N: usize> Iterator for Rainbow<N> {
 }
 
 /// Solid color.
+#[derive(Default)]
 pub struct Solid<const N: usize> {
     color: RGB,
     finished: bool,
@@ -52,6 +70,13 @@ impl<const N: usize> Solid<N> {
             color,
             finished: false,
         }
+    }
+}
+
+impl<const N: usize> LedEffect<N> for Solid<N> {
+    fn configure(&mut self, params: LedEffectParams) {
+        self.color = params.color1;
+        self.finished = false;
     }
 }
 
@@ -75,29 +100,26 @@ pub struct Polyrhythm<const N: usize> {
     end_color: CIELUV,
 }
 
-impl<const N: usize> Polyrhythm<N> {
-    pub fn new(start_color: RGB, end_color: RGB) -> Self {
+impl<const N: usize> Default for Polyrhythm<N> {
+    fn default() -> Self {
         const FRAC: f32 = core::f32::consts::TAU / (360.0 * 6.0);
         let mut spinners = [Spinner::default(); N];
         for i in 0..N {
             spinners[i].angle = FRAC * i as f32;
             spinners[i].angular_velocity = FRAC * ((i + 1) as f32);
         }
-        debug!("Color 1 RGB: {start_color:?}");
-        debug!("Color 2 RGB: {end_color:?}");
-        let start_color: XYZ = start_color.into();
-        let end_color: XYZ = end_color.into();
-        debug!("Color 1 XYZ: {start_color:?}");
-        debug!("Color 2 XYZ: {end_color:?}");
-        let start_color = start_color.into();
-        let end_color = end_color.into();
-        debug!("Color 1 CIELUV: {start_color:?}");
-        debug!("Color 2 CIELUV: {end_color:?}");
         Self {
             spinners,
-            start_color,
-            end_color,
+            start_color: CIELUV::default(),
+            end_color: CIELUV::default(),
         }
+    }
+}
+
+impl<const N: usize> LedEffect<N> for Polyrhythm<N> {
+    fn configure(&mut self, params: LedEffectParams) {
+        self.start_color = params.color1.into();
+        self.end_color = params.color2.into();
     }
 }
 

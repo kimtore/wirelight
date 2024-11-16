@@ -5,9 +5,10 @@ pub mod rust_mqtt;
 pub mod led;
 pub mod color;
 
-use crate::led::{Strip};
+use crate::led::{LedEffect, LedEffectParams};
 use embassy_executor::Spawner;
 use embassy_time::Duration;
+use embedded_io_async::{Read, Write};
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
 use esp_hal::dma::DmaPriority;
@@ -20,11 +21,13 @@ use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::WifiController;
-use heapless::spsc;
+use heapless::{spsc};
+use rand_core::RngCore;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
 use crate::color::RGB;
+use crate::rust_mqtt::client::client::MqttClient;
 
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
@@ -38,18 +41,41 @@ const LED_COUNT: usize = 60;
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
 static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
-static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffect, 4>> = StaticCell::new();
+static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 4>> = StaticCell::new();
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
 static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
 static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
-#[derive(Debug)]
-enum LedEffect {
-    Fill(RGB),
+#[derive(Debug, Default, Copy, Clone)]
+struct ServerState {
+    effect: Effect,
+    led_effect_params: LedEffectParams,
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+enum Effect {
+    Solid,
+    #[default]
     Rainbow,
-    Polyrhythm(RGB, RGB),
+    Polyrhythm,
+}
+
+impl Effect {
+    fn serialize(&self) -> &'static str {
+        match self {
+            Effect::Solid => "solid",
+            Effect::Rainbow => "rainbow",
+            Effect::Polyrhythm => "polyrhythm",
+        }
+    }
+}
+
+#[derive(Debug)]
+enum LedEffectCommand {
+    ChangeEffect(Effect),
+    ConfigureParams(LedEffectParams),
 }
 
 #[main]
@@ -106,12 +132,10 @@ async fn main(spawner: Spawner) {
     );
 
     let command_queue: &'static mut _ = COMMAND_QUEUE.init(
-        spsc::Queue::<LedEffect, 4>::new()
+        spsc::Queue::<LedEffectCommand, 4>::new()
     );
 
-    let (mut producer, consumer) = command_queue.split();
-
-    producer.enqueue(LedEffect::Rainbow).unwrap();
+    let (producer, consumer) = command_queue.split();
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
@@ -126,7 +150,7 @@ async fn main(spawner: Spawner) {
 #[embassy_executor::task]
 async fn mqtt_task(
     stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
-    mut queue: spsc::Producer<'static, LedEffect, 4>,
+    mut queue: spsc::Producer<'static, LedEffectCommand, 4>,
 ) {
     use embassy_net::tcp::TcpSocket;
     use embassy_time::Timer;
@@ -211,7 +235,7 @@ async fn mqtt_task(
 
         info!("MQTT authenticated.");
 
-        if let Err(err) = client.subscribe_to_topic("led/pallet/color/set").await {
+        if let Err(err) = client.subscribe_to_topic("led/pallet/+/set").await {
             error!("Unable to subscribe to {}: {:?}", "topic", err);
             Timer::after_secs(5).await;
             continue;
@@ -219,45 +243,123 @@ async fn mqtt_task(
 
         info!("MQTT subscribed.");
 
-        let mut rgb;
+        let mut state = ServerState::default();
 
         loop {
-            match client.receive_message().await {
-                Ok((topic, data)) => {
-                    debug!("MQTT receive on {}: {:?}", topic, data);
-
-                    match RGB::parse(data) {
-                        None => { continue; }
-                        Some(value) => { rgb = value; }
-                    };
-                    info!("<-- R={}, G={}, B={}", rgb.r,rgb.g,rgb.b);
-                    let start_color = RGB{
-                        r: 0.0,
-                        g: 0.0,
-                        b: 255.0,
-                    };
-                    let _ = queue.enqueue(LedEffect::Polyrhythm(start_color, rgb.clone()));
-                }
-                Err(err) => {
-                    error!("MQTT receive packet error: {:?}", err);
-                    break;
-                }
-            }
-
-            let Some(rgb_string) = rgb.serialize() else {
-                error!("Cannot serialize RGB string from {:?}", rgb);
+            let Err(err) = mqtt_process_message(&mut client, &mut state, &mut queue).await else {
                 continue;
             };
 
-            match client.send_message("led/pallet/color", rgb_string.as_bytes(), QualityOfService::QoS0, false).await {
-                Ok(_) => info!("Published state"),
-                Err(err) => {
-                    error!("MQTT error publishing state: {:?}", err);
+            match err {
+                MqttProcessMessageError::MqttReceive(err) => {
+                    error!("MQTT receive packet error: {:?}", err);
                     break;
                 }
-            };
+                MqttProcessMessageError::MqttPublish(err) => {
+                    error!("MQTT publish packet error: {:?}", err);
+                    break;
+                }
+                MqttProcessMessageError::InvalidTopic => {
+                    debug!("MQTT received data on unrecognized topic");
+                }
+                MqttProcessMessageError::ParseParameter => {
+                    error!("Unable to parse color or effect parameter from MQTT");
+                }
+                MqttProcessMessageError::SerializeRGB => {
+                    error!("RGB serialization failed");
+                }
+            }
         }
     }
+}
+
+struct MqttMessage<'a>(&'a [u8]);
+
+impl MqttMessage<'_> {
+    fn parse_rgb(&self) -> Option<RGB> {
+        RGB::parse(self.0)
+    }
+
+    fn parse_effect(&self) -> Option<Effect> {
+        let effect_str = core::str::from_utf8(self.0).ok()?;
+        match effect_str {
+            "rainbow" => Some(Effect::Rainbow),
+            "solid" => Some(Effect::Solid),
+            "polyrhythm" => Some(Effect::Polyrhythm),
+            _ => None,
+        }
+    }
+}
+
+enum MqttProcessMessageError {
+    MqttReceive(rust_mqtt::packet::v5::reason_codes::ReasonCode),
+    MqttPublish(rust_mqtt::packet::v5::reason_codes::ReasonCode),
+    InvalidTopic,
+    ParseParameter,
+    SerializeRGB,
+}
+
+/// Receive a message over MQTT, configure LEDs based on that, and report back the current state.
+async fn mqtt_process_message<'a, T, const MAX_PROPERTIES: usize, R>(
+    client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
+    state: &mut ServerState,
+    queue: &mut spsc::Producer<'static, LedEffectCommand, 4>,
+) -> Result<(), MqttProcessMessageError>
+where
+    T: Read + Write,
+    R: RngCore,
+{
+    use MqttProcessMessageError::*;
+    use rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS0;
+
+    let (topic, data) = client.receive_message().await.map_err(MqttReceive)?;
+
+    debug!("MQTT receive on {}: {:?}", topic, data);
+
+    let message = MqttMessage(data);
+
+    match topic {
+        "led/pallet/color1/set" => {
+            state.led_effect_params.color1 = message.parse_rgb().ok_or(ParseParameter)?;
+            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
+        }
+        "led/pallet/color2/set" => {
+            state.led_effect_params.color2 = message.parse_rgb().ok_or(ParseParameter)?;
+            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
+        }
+        "led/pallet/effect/set" => {
+            state.effect = message.parse_effect().ok_or(ParseParameter)?;
+            let _ = queue.enqueue(LedEffectCommand::ChangeEffect(state.effect));
+        }
+        _ => return Err(InvalidTopic)
+    };
+
+    info!("Received new parameters: {:?}", state);
+
+    client.send_message(
+        "led/pallet/color1",
+        state.led_effect_params.color1
+            .serialize()
+            .ok_or(SerializeRGB)?
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    client.send_message(
+        "led/pallet/color2",
+        state.led_effect_params.color2
+            .serialize()
+            .ok_or(SerializeRGB)?
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    client.send_message(
+        "led/pallet/effect",
+        state.effect
+            .serialize()
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    Ok(())
 }
 
 #[embassy_executor::task]
@@ -320,7 +422,7 @@ async fn led_task(
     pin: GpioPin<8>,
     dma: esp_hal::peripherals::DMA,
     clocks: &'static Clocks<'static>,
-    mut queue: spsc::Consumer<'static, LedEffect, 4>,
+    mut queue: spsc::Consumer<'static, LedEffectCommand, 4>,
 ) {
     info!("LED task started.");
     info!("Setting up DMA buffers.");
@@ -358,35 +460,38 @@ async fn led_task(
 
     info!("WS2812 driver started on SPI2 and GPIO8.");
 
+    use static_box::Box;
+    let mut mem = [0_u8; 4096];
+    let mut effect: Box<dyn LedEffect<LED_COUNT>> = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::default());
+    let mut state = LedEffectParams::default();
+
     loop {
         let Some(command) = queue.dequeue() else {
             embassy_time::Timer::after_millis(1).await;
             continue;
         };
 
-        use static_box::Box;
-        let mut mem = [0_u8; 4096];
-        let mut effect: Box<dyn Iterator<Item=Strip<LED_COUNT>>>;
-        const BRIGHTNESS: u8 = 127;
-
         match command {
-            LedEffect::Fill(rgb) => {
-                info!("Fill with color: {rgb:?}");
-                effect = Box::new(&mut mem, led::Solid::<LED_COUNT>::new(rgb));
+            LedEffectCommand::ChangeEffect(eff) => {
+                drop(effect);
+                effect = match eff {
+                    Effect::Solid => Box::new(&mut mem, led::Solid::<LED_COUNT>::default()),
+                    Effect::Rainbow => Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default()),
+                    Effect::Polyrhythm => Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::default()),
+                };
+                effect.configure(state.clone());
             }
-            LedEffect::Rainbow => {
-                info!("Starting effect: RAINBOW");
-                effect = Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default());
-            }
-            LedEffect::Polyrhythm(start, end) => {
-                info!("Starting effect: POLYRHYTHM");
-                effect = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::new(start, end));
+            LedEffectCommand::ConfigureParams(new_state) => {
+                state = new_state;
+                effect.configure(state.clone());
             }
         }
 
         // Run the current effect until it is exhausted, or the user has requested a new effect.
         while let Some(strip) = effect.next() {
             let data = strip.to_rgb8();
+
+            const BRIGHTNESS: u8 = 127;
 
             let data = smart_leds::brightness(
                 smart_leds::gamma(data.iter().cloned()),
