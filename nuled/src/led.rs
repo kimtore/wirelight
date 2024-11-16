@@ -40,15 +40,15 @@ impl<const N: usize> Strip<N> {
 
 /// Loop through all hues on maximum saturation and brightness.
 pub struct Rainbow<const N: usize> {
-    angle: f32,
-    angular_velocity: f32,
+    degrees: f32,
+    degree_velocity: f32,
 }
 
 impl<const N: usize> Default for Rainbow<N> {
     fn default() -> Self {
         Self {
-            angle: 0.0,
-            angular_velocity: 1.0,
+            degrees: 0.0,
+            degree_velocity: 0.5,
         }
     }
 }
@@ -62,8 +62,8 @@ impl<const N: usize> Iterator for Rainbow<N> {
 
     /// Circle through the HCL color space for rainbow colors.
     fn next(&mut self) -> Option<Self::Item> {
-        let color = HCL { h: self.angle, c: 0.75, l: 0.5 };
-        self.angle += self.angular_velocity;
+        let color = HCL { h: self.degrees, c: 0.75, l: 0.5 };
+        self.degrees += self.degree_velocity;
         Some(Strip::fill(color))
     }
 }

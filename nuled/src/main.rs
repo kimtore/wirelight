@@ -19,6 +19,7 @@ use esp_hal::rng::Rng;
 use esp_hal::spi::SpiMode;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
+use esp_wifi::current_millis;
 use esp_wifi::wifi::WifiController;
 use heapless::{spsc};
 use smart_leds::SmartLedsWrite;
@@ -265,23 +266,41 @@ async fn led_task(
             }
         }
 
+        let mut last_effect_millis = current_millis();
+
         // Run the current effect until it is exhausted, or the user has requested a new effect.
         while let Some(strip) = effect.next() {
-            let data = strip.to_rgb8();
+            /// Maximum amount of time budget for one frame of animation.
+            /// 41.66ms corresponds to 24 frames per second, which is sufficient
+            /// for the eye to not notice individual frames.
+            const EFFECT_RUNTIME_NOMINAL_USEC: i64 = 41666;
 
+            /// Maximum LED brightness regardless of other parameters.
             const BRIGHTNESS: u8 = 127;
 
-            let data = smart_leds::brightness(
-                smart_leds::gamma(data.iter().cloned()),
-                BRIGHTNESS,
-            );
+            // let data = smart_leds::brightness(
+            //     smart_leds::gamma(data.iter().cloned()),
+            //     BRIGHTNESS,
+            // );
+            let rgb_values = strip.to_rgb8();
+            let gamma_corrected = smart_leds::gamma(rgb_values.iter().cloned());
 
             critical_section::with(|_| {
-                ws.write(data).unwrap();
+                ws.write(gamma_corrected).unwrap();
             });
 
-            // 33 ms wait time corresponds to approximately 30 frames per second.
-            embassy_time::Timer::after_millis(33).await;
+            let effect_runtime = (current_millis() - last_effect_millis) as i64;
+            last_effect_millis = current_millis();
+            let sleep_time = EFFECT_RUNTIME_NOMINAL_USEC - 1000 * effect_runtime;
+
+            if sleep_time.is_negative() {
+                warn!("Effect iteration took too long, {} us is above target of {EFFECT_RUNTIME_NOMINAL_USEC} us", effect_runtime*1000);
+            }
+
+            let sleep_time = sleep_time.clamp(1, EFFECT_RUNTIME_NOMINAL_USEC) as u64;
+            debug!("Effect iteration took {effect_runtime} ms, yielding task for {sleep_time} ms");
+
+            embassy_time::Timer::after_micros(sleep_time).await;
 
             if let Some(_) = queue.peek() {
                 break;
