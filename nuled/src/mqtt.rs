@@ -240,6 +240,12 @@ where
         "led/pallet/luminance/set" => {
             state.led_effect_params.luminance = message.parse_float().ok_or(ParseParameter)?;
         }
+        "led/pallet/speed/set" => {
+            state.led_effect_params.speed = message.parse_float().ok_or(ParseParameter)?;
+        }
+        "led/pallet/size/set" => {
+            state.led_effect_params.size = message.parse_float().ok_or(ParseParameter)?;
+        }
         "led/pallet/effect/set" => {
             state.effect = message.parse_effect().ok_or(ParseParameter)?;
             let _ = queue.enqueue(LedEffectCommand::ChangeEffect(state.effect));
@@ -276,6 +282,18 @@ where
     client.send_message(
         "led/pallet/chroma",
         buf.format(state.led_effect_params.chroma)
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    client.send_message(
+        "led/pallet/speed",
+        buf.format(state.led_effect_params.speed)
+            .as_bytes(), QoS0, false,
+    ).await.map_err(MqttPublish)?;
+
+    client.send_message(
+        "led/pallet/size",
+        buf.format(state.led_effect_params.size)
             .as_bytes(), QoS0, false,
     ).await.map_err(MqttPublish)?;
 

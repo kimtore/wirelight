@@ -1,6 +1,6 @@
 use core::convert::Into;
 use num_traits::float::Float;
-use crate::color::{CIELUV, HCL, RGB};
+use crate::color::{lerp, CIELUV, HCL, RGB};
 
 /// One degree through a full circle, expressed in radians.
 const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
@@ -13,9 +13,10 @@ const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
 pub struct LedEffectParams {
     pub color1: RGB,
     pub color2: RGB,
-    pub speed: f32,
     pub chroma: f32,
     pub luminance: f32,
+    pub size: f32,
+    pub speed: f32,
 }
 
 impl Default for LedEffectParams {
@@ -23,9 +24,10 @@ impl Default for LedEffectParams {
         Self {
             color1: RGB::default(),
             color2: RGB::default(),
-            speed: 1.0,
             chroma: 0.75,
             luminance: 0.5,
+            size: 1.0,
+            speed: 0.5,
         }
     }
 }
@@ -80,6 +82,8 @@ impl<const N: usize> LedEffect<N> for Rainbow<N> {
     fn configure(&mut self, params: LedEffectParams) {
         self.chroma = params.chroma;
         self.luminance = params.luminance;
+        self.degree_velocity = lerp(0.0, 3.0, params.speed);
+        self.separation = lerp(0.0, 360.0 / N as f32, params.size);
     }
 }
 
