@@ -126,7 +126,9 @@ async fn main(spawner: Spawner) {
         spsc::Queue::<LedEffectCommand, 4>::new()
     );
 
-    let (producer, consumer) = command_queue.split();
+    let (mut producer, consumer) = command_queue.split();
+
+    let _ = producer.enqueue(LedEffectCommand::ChangeEffect(Effect::Rainbow));
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
