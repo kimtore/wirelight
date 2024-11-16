@@ -1,9 +1,9 @@
-/// The following code was first written by GPT-o4,
-/// and subsequently modified.
+/// Color manipulation library.
+///
+/// Allows conversion between RGB, XYZ and CIELUV color spaces,
+/// as well as creation of gradients through the CIELUV color space.
 
 use num_traits::Float;
-use heapless::String;
-use core::fmt::Write;
 
 /// Red, green, blue.
 #[derive(Default, Debug, Clone, Copy)]
@@ -11,53 +11,6 @@ pub struct RGB {
     pub r: f32,
     pub g: f32,
     pub b: f32,
-}
-
-impl RGB {
-    /// Produce a comma-separated value, suitable for OpenHAB.
-    pub fn serialize(&self) -> Option<String<11>> {
-        let mut s = String::new();
-        write!(s, "{},{},{}", self.r, self.g, self.b).ok()?;
-        Some(s)
-    }
-
-    /// Parse a comma-separated value from OpenHAB.
-    pub fn parse(data: &[u8]) -> Option<Self> {
-        let mut iter = data.iter();
-        let r = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        let g = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        let b = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        Some(Self { r, g, b })
-    }
-
-    /// Parse a single number up to three digits wide,
-    /// and optionally a comma separator, unless end of line is reached.
-    fn parse_int_and_delimiter<'a>(mut iter: impl Iterator<Item=&'a u8>) -> Option<u8> {
-        use core::str::FromStr;
-        use heapless::String;
-        let mut number_string = String::<3>::new();
-
-        loop {
-            let char = match iter.next() {
-                None => None,
-                Some(c) if *c as char == ',' => None,
-                Some(c) => Some(*c as char),
-            };
-
-            match char {
-                None => {
-                    break;
-                }
-                Some(char) => {
-                    if let Err(_) = number_string.push(char) {
-                        return None;
-                    };
-                }
-            }
-        }
-
-        u8::from_str(number_string.as_str()).ok()
-    }
 }
 
 impl From<XYZ> for RGB {

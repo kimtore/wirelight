@@ -4,11 +4,10 @@
 pub mod rust_mqtt;
 pub mod led;
 pub mod color;
+pub mod mqtt;
 
 use crate::led::{LedEffect, LedEffectParams};
 use embassy_executor::Spawner;
-use embassy_time::Duration;
-use embedded_io_async::{Read, Write};
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
 use esp_hal::dma::DmaPriority;
@@ -22,12 +21,9 @@ use esp_hal::system::SystemControl;
 use esp_hal::timer::timg::TimerGroup;
 use esp_wifi::wifi::WifiController;
 use heapless::{spsc};
-use rand_core::RngCore;
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
-use crate::color::RGB;
-use crate::rust_mqtt::client::client::MqttClient;
 
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
@@ -42,11 +38,6 @@ static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
 static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
 static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 4>> = StaticCell::new();
-
-const RX_BUFFER_SIZE: usize = 16384;
-const TX_BUFFER_SIZE: usize = 16384;
-static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
-static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
 #[derive(Debug, Default, Copy, Clone)]
 struct ServerState {
@@ -139,227 +130,12 @@ async fn main(spawner: Spawner) {
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
-    spawner.must_spawn(mqtt_task(network_stack, producer));
+    spawner.must_spawn(mqtt::mqtt_task(network_stack, producer));
     spawner.must_spawn(led_task(peripherals.SPI2, io.pins.gpio8, peripherals.DMA, clocks, consumer));
 
     loop {
         embassy_time::Timer::after_secs(1).await;
     }
-}
-
-#[embassy_executor::task]
-async fn mqtt_task(
-    stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
-    mut queue: spsc::Producer<'static, LedEffectCommand, 4>,
-) {
-    use embassy_net::tcp::TcpSocket;
-    use embassy_time::Timer;
-    use embassy_net::dns;
-
-    // MQTT related imports
-    use rust_mqtt::{
-        client::{client::MqttClient, client_config::ClientConfig},
-        utils::rng_generator::CountingRng,
-    };
-    use rust_mqtt::packet::v5::publish_packet::QualityOfService;
-
-    loop {
-        if !stack.is_link_up() {
-            warn!("Waiting for network...");
-            Timer::after_secs(1).await;
-            continue;
-        }
-
-        let Some(config) = stack.config_v4() else {
-            warn!("Waiting for IPv4 address...");
-            Timer::after_secs(1).await;
-            continue;
-        };
-
-
-        info!("Acquired IPv4 address {}", config.address);
-
-        let mqtt_server_ip = match stack.dns_query(MQTT_SERVER, dns::DnsQueryType::A).await {
-            Err(err) => {
-                warn!("DNS query failed for {}, retrying in 30s: {:?}", MQTT_SERVER, err);
-                Timer::after_secs(30).await;
-                continue;
-            }
-            Ok(ips) => ips[0],
-        };
-
-        let mut sock = TcpSocket::new(
-            stack,
-            unsafe { &mut *core::ptr::addr_of_mut!(RX_BUFFER) },
-            unsafe { &mut *core::ptr::addr_of_mut!(TX_BUFFER) },
-        );
-
-        sock.set_timeout(Some(Duration::from_secs(30)));
-        sock.set_keep_alive(Some(Duration::from_secs(15)));
-
-        info!("Connecting to {} ({}) port {}...", MQTT_SERVER, mqtt_server_ip, MQTT_PORT);
-
-        if let Err(err) = sock.connect((mqtt_server_ip, MQTT_PORT)).await {
-            error!("Unable to connect to MQTT at {}:{}: {:?}", MQTT_SERVER, MQTT_PORT, err);
-            Timer::after_secs(5).await;
-            continue;
-        };
-
-        info!("Connected to MQTT, authenticating...");
-
-        const MQTT_BUFFER_SIZE: usize = 1024;
-
-        let mut config = ClientConfig::new(
-            rust_mqtt::client::client_config::MqttVersion::MQTTv5,
-            CountingRng(20000),
-        );
-
-        config.add_username(MQTT_USERNAME);
-        config.add_password(MQTT_PASSWORD);
-        config.add_max_subscribe_qos(QualityOfService::QoS1);
-        config.add_client_id("ruled");
-        config.max_packet_size = MQTT_BUFFER_SIZE as u32;
-        config.keep_alive = 3600;
-
-        let mut recv_buffer = [0; MQTT_BUFFER_SIZE];
-        let mut write_buffer = [0; MQTT_BUFFER_SIZE];
-
-        let mut client =
-            MqttClient::<_, 5, _>::new(sock, &mut write_buffer, MQTT_BUFFER_SIZE, &mut recv_buffer, MQTT_BUFFER_SIZE, config);
-
-        if let Err(err) = client.connect_to_broker().await {
-            error!("MQTT authentication failed: {:?}", err);
-            Timer::after_secs(5).await;
-            continue;
-        }
-
-        info!("MQTT authenticated.");
-
-        if let Err(err) = client.subscribe_to_topic("led/pallet/+/set").await {
-            error!("Unable to subscribe to {}: {:?}", "topic", err);
-            Timer::after_secs(5).await;
-            continue;
-        };
-
-        info!("MQTT subscribed.");
-
-        let mut state = ServerState::default();
-
-        loop {
-            let Err(err) = mqtt_process_message(&mut client, &mut state, &mut queue).await else {
-                continue;
-            };
-
-            match err {
-                MqttProcessMessageError::MqttReceive(err) => {
-                    error!("MQTT receive packet error: {:?}", err);
-                    break;
-                }
-                MqttProcessMessageError::MqttPublish(err) => {
-                    error!("MQTT publish packet error: {:?}", err);
-                    break;
-                }
-                MqttProcessMessageError::InvalidTopic => {
-                    debug!("MQTT received data on unrecognized topic");
-                }
-                MqttProcessMessageError::ParseParameter => {
-                    error!("Unable to parse color or effect parameter from MQTT");
-                }
-                MqttProcessMessageError::SerializeRGB => {
-                    error!("RGB serialization failed");
-                }
-            }
-        }
-    }
-}
-
-struct MqttMessage<'a>(&'a [u8]);
-
-impl MqttMessage<'_> {
-    fn parse_rgb(&self) -> Option<RGB> {
-        RGB::parse(self.0)
-    }
-
-    fn parse_effect(&self) -> Option<Effect> {
-        let effect_str = core::str::from_utf8(self.0).ok()?;
-        match effect_str {
-            "rainbow" => Some(Effect::Rainbow),
-            "solid" => Some(Effect::Solid),
-            "polyrhythm" => Some(Effect::Polyrhythm),
-            _ => None,
-        }
-    }
-}
-
-enum MqttProcessMessageError {
-    MqttReceive(rust_mqtt::packet::v5::reason_codes::ReasonCode),
-    MqttPublish(rust_mqtt::packet::v5::reason_codes::ReasonCode),
-    InvalidTopic,
-    ParseParameter,
-    SerializeRGB,
-}
-
-/// Receive a message over MQTT, configure LEDs based on that, and report back the current state.
-async fn mqtt_process_message<'a, T, const MAX_PROPERTIES: usize, R>(
-    client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
-    state: &mut ServerState,
-    queue: &mut spsc::Producer<'static, LedEffectCommand, 4>,
-) -> Result<(), MqttProcessMessageError>
-where
-    T: Read + Write,
-    R: RngCore,
-{
-    use MqttProcessMessageError::*;
-    use rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS0;
-
-    let (topic, data) = client.receive_message().await.map_err(MqttReceive)?;
-
-    debug!("MQTT receive on {}: {:?}", topic, data);
-
-    let message = MqttMessage(data);
-
-    match topic {
-        "led/pallet/color1/set" => {
-            state.led_effect_params.color1 = message.parse_rgb().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
-        }
-        "led/pallet/color2/set" => {
-            state.led_effect_params.color2 = message.parse_rgb().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
-        }
-        "led/pallet/effect/set" => {
-            state.effect = message.parse_effect().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ChangeEffect(state.effect));
-        }
-        _ => return Err(InvalidTopic)
-    };
-
-    info!("Received new parameters: {:?}", state);
-
-    client.send_message(
-        "led/pallet/color1",
-        state.led_effect_params.color1
-            .serialize()
-            .ok_or(SerializeRGB)?
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/color2",
-        state.led_effect_params.color2
-            .serialize()
-            .ok_or(SerializeRGB)?
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/effect",
-        state.effect
-            .serialize()
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    Ok(())
 }
 
 #[embassy_executor::task]
