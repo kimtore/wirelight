@@ -33,7 +33,7 @@ const MQTT_PORT: u16 = 1883; //env!("NULED_MQTT_PORT");
 const MQTT_USERNAME: &'static str = env!("NULED_MQTT_USERNAME");
 const MQTT_PASSWORD: &'static str = env!("NULED_MQTT_PASSWORD");
 
-const LED_COUNT: usize = 60;
+const LED_COUNT: usize = 29;
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
@@ -275,8 +275,8 @@ async fn led_task(
             /// for the eye to not notice individual frames.
             const EFFECT_RUNTIME_NOMINAL_USEC: i64 = 41666;
 
-            /// Maximum LED brightness regardless of other parameters.
-            const BRIGHTNESS: u8 = 127;
+            // Maximum LED brightness regardless of other parameters.
+            //const BRIGHTNESS: u8 = 127;
 
             // let data = smart_leds::brightness(
             //     smart_leds::gamma(data.iter().cloned()),

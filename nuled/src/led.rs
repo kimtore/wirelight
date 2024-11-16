@@ -54,12 +54,14 @@ impl<const N: usize> Strip<N> {
     }
 }
 
-/// Loop through all hues on maximum saturation and brightness.
+/// Circle through the HCL color space for rainbow colors.
 pub struct Rainbow<const N: usize> {
     chroma: f32,
     luminance: f32,
     degrees: f32,
     degree_velocity: f32,
+    /// Degree separation between LEDs to have entire spectrum across strip
+    separation: f32,
 }
 
 impl<const N: usize> Default for Rainbow<N> {
@@ -68,7 +70,8 @@ impl<const N: usize> Default for Rainbow<N> {
             chroma: 0.0,
             luminance: 0.0,
             degrees: 0.0,
-            degree_velocity: ONE_DEGREE_RAD * 30.0,
+            degree_velocity: 1.0,
+            separation: 360.0 / N as f32,
         }
     }
 }
@@ -83,14 +86,21 @@ impl<const N: usize> LedEffect<N> for Rainbow<N> {
 impl<const N: usize> Iterator for Rainbow<N> {
     type Item = Strip<N>;
 
-    /// Circle through the HCL color space for rainbow colors.
     fn next(&mut self) -> Option<Self::Item> {
-        let color = HCL { h: self.degrees, c: self.chroma, l: self.luminance };
+        let mut strip = Strip::<N>::default();
+        for i in 0..N {
+            strip.0[i] = HCL {
+                h: self.degrees + self.separation * i as f32,
+                c: self.chroma,
+                l: self.luminance,
+            }.into();
+        }
         self.degrees += self.degree_velocity;
+        Some(strip)
         //let color = color.to_rgb_fast();
         //let rgb_color: RGB = color.into();
         //info!("{color:?} -> {rgb_color:?}");
-        Some(Strip::fill(color))
+        //Some(Strip::fill(color))
     }
 }
 
