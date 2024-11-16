@@ -1,5 +1,9 @@
+use core::convert::Into;
 use num_traits::float::Float;
-use crate::color::{CIELUV, HSV, RGB};
+use crate::color::{CIELUV, HCL, RGB};
+
+/// One degree through a full circle, expressed in radians.
+const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
 
 /// Global LED params.
 /// To make the OpenHAB API extremely simple, we define a set of common parameters
@@ -35,9 +39,18 @@ impl<const N: usize> Strip<N> {
 }
 
 /// Loop through all hues on maximum saturation and brightness.
-#[derive(Default)]
 pub struct Rainbow<const N: usize> {
-    seq_no: u8,
+    angle: f32,
+    angular_velocity: f32,
+}
+
+impl<const N: usize> Default for Rainbow<N> {
+    fn default() -> Self {
+        Self {
+            angle: 0.0,
+            angular_velocity: 1.0,
+        }
+    }
 }
 
 impl<const N: usize> LedEffect<N> for Rainbow<N> {
@@ -47,13 +60,11 @@ impl<const N: usize> LedEffect<N> for Rainbow<N> {
 impl<const N: usize> Iterator for Rainbow<N> {
     type Item = Strip<N>;
 
+    /// Circle through the HCL color space for rainbow colors.
     fn next(&mut self) -> Option<Self::Item> {
-        self.seq_no += 1;
-        Some(Strip::fill(HSV {
-            hue: self.seq_no,
-            sat: 255,
-            val: 255,
-        }))
+        let color = HCL { h: self.angle, c: 0.75, l: 0.5 };
+        self.angle += self.angular_velocity;
+        Some(Strip::fill(color))
     }
 }
 
@@ -102,11 +113,10 @@ pub struct Polyrhythm<const N: usize> {
 
 impl<const N: usize> Default for Polyrhythm<N> {
     fn default() -> Self {
-        const FRAC: f32 = core::f32::consts::TAU / (360.0 * 6.0);
         let mut spinners = [Spinner::default(); N];
         for i in 0..N {
-            spinners[i].angle = FRAC * i as f32;
-            spinners[i].angular_velocity = FRAC * ((i + 1) as f32);
+            spinners[i].angle = (ONE_DEGREE_RAD / 6.0) * i as f32;
+            spinners[i].angular_velocity = (ONE_DEGREE_RAD / 6.0) * ((i + 1) as f32);
         }
         Self {
             spinners,
@@ -131,7 +141,7 @@ impl<const N: usize> Iterator for Polyrhythm<N> {
         for i in 0..N {
             // translate the range from -1.0..1.0 to 0.0..1.0.
             let amplitude = (1.0 + self.spinners[i].amplitude()) / 2.0;
-            let interpolated = self.start_color.interpolate(self.end_color, amplitude);
+            let interpolated = self.start_color.interpolate(&self.end_color, amplitude);
             if i == 0 {
                 debug!("Polyrhythm: {amplitude:.5} -> {:?}", interpolated);
             }

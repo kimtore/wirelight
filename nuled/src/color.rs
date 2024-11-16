@@ -34,6 +34,12 @@ impl From<CIELUV> for RGB {
     }
 }
 
+impl From<HCL> for RGB {
+    fn from(hcl: HCL) -> Self {
+        CIELUV::from(hcl).into()
+    }
+}
+
 impl Into<smart_leds::RGB8> for RGB {
     fn into(self) -> smart_leds::RGB8 {
         smart_leds::RGB8 {
@@ -182,7 +188,7 @@ pub struct CIELUV {
 impl CIELUV {
     /// Interpolate between two CIELUV colors based on a parameter `t` (0.0 to 1.0).
     /// `t = 0.0` returns the start color, `t = 1.0` returns the end color.
-    pub fn interpolate(&self, end: Self, t: f32) -> Self {
+    pub fn interpolate(&self, end: &Self, t: f32) -> Self {
         Self {
             l: lerp(self.l, end.l, t),
             u: lerp(self.u, end.u, t),
@@ -221,6 +227,24 @@ impl From<RGB> for CIELUV {
     fn from(rgb: RGB) -> Self {
         XYZ::from(rgb).into()
     }
+}
+
+impl From<HCL> for CIELUV {
+    fn from(hcl: HCL) -> Self {
+        let h_rad = hcl.h.to_radians(); // Convert hue to radians
+        let u = hcl.c * h_rad.cos();
+        let v = hcl.c * h_rad.sin();
+        CIELUV { l: hcl.l, u, v }
+    }
+}
+
+/// Hue, chroma, luminance.
+/// https://cscheid.github.io/lux/demos/hcl/hcl.html
+pub struct HCL {
+    /// Hue in degrees, 0.0..360.0.
+    pub h: f32,
+    pub c: f32,
+    pub l: f32,
 }
 
 /// Helper function to perform linear interpolation
