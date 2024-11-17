@@ -15,10 +15,11 @@ pub struct RGB {
 
 impl From<XYZ> for RGB {
     fn from(xyz: XYZ) -> Self {
-        // not verified...
-        let r = 3.2406 * xyz.x - 1.5372 * xyz.y - 0.4986 * xyz.z;
-        let g = -0.9689 * xyz.x + 1.8758 * xyz.y + 0.0415 * xyz.z;
-        let b = 0.0557 * xyz.x - 0.2040 * xyz.y + 1.0570 * xyz.z;
+        // sYCC: Amendment 1 to IEC 61966-2-1:1999.
+        // Higher conversion precision with seven decimals.
+        let r = 3.2406255 * xyz.x - 1.5372080 * xyz.y - 0.4986286 * xyz.z;
+        let g = -0.9689307 * xyz.x + 1.8758561 * xyz.y + 0.0415175 * xyz.z;
+        let b = 0.0557101 * xyz.x - 0.2040211 * xyz.y + 1.0570959 * xyz.z;
 
         Self {
             r: (linear_to_srgb(r) * 255.0).max(0.0).min(255.0),
