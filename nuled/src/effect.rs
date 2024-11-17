@@ -10,7 +10,7 @@ const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
 /// To make the OpenHAB API extremely simple, we define a set of common parameters.
 /// Effects may use as many as these as they need.
 #[derive(Copy, Clone, Debug)]
-pub struct LedEffectParams {
+pub struct Params {
     pub color1: RGB,
     pub color2: RGB,
     pub chroma: f32,
@@ -19,7 +19,7 @@ pub struct LedEffectParams {
     pub speed: f32,
 }
 
-impl Default for LedEffectParams {
+impl Default for Params {
     fn default() -> Self {
         Self {
             color1: RGB::default(),
@@ -32,8 +32,8 @@ impl Default for LedEffectParams {
     }
 }
 
-pub trait LedEffect<const N: usize>: Iterator<Item=Strip<N>> {
-    fn configure(&mut self, params: LedEffectParams);
+pub trait Effect<const N: usize>: Iterator<Item=Strip<N>> {
+    fn configure(&mut self, params: Params);
 }
 
 pub struct Strip<const N: usize>(pub [RGB; N]);
@@ -67,8 +67,8 @@ pub struct Rainbow<const N: usize> {
     separation: f32,
 }
 
-impl<const N: usize> LedEffect<N> for Rainbow<N> {
-    fn configure(&mut self, params: LedEffectParams) {
+impl<const N: usize> Effect<N> for Rainbow<N> {
+    fn configure(&mut self, params: Params) {
         self.chroma = params.chroma;
         self.luminance = params.luminance;
         self.degree_velocity = lerp(0.0, 0.6, params.speed);
@@ -109,8 +109,8 @@ impl<const N: usize> Solid<N> {
     }
 }
 
-impl<const N: usize> LedEffect<N> for Solid<N> {
-    fn configure(&mut self, params: LedEffectParams) {
+impl<const N: usize> Effect<N> for Solid<N> {
+    fn configure(&mut self, params: Params) {
         self.color = params.color1;
         self.finished = false;
     }
@@ -151,8 +151,8 @@ impl<const N: usize> Default for Gradient<N> {
     }
 }
 
-impl<const N: usize> LedEffect<N> for Gradient<N> {
-    fn configure(&mut self, params: LedEffectParams) {
+impl<const N: usize> Effect<N> for Gradient<N> {
+    fn configure(&mut self, params: Params) {
         self.start_color = params.color1.into();
         self.end_color = params.color2.into();
         self.angular_velocity = lerp(0.0, 0.33, params.speed);
@@ -194,8 +194,8 @@ impl<const N: usize> Default for Polyrhythm<N> {
     }
 }
 
-impl<const N: usize> LedEffect<N> for Polyrhythm<N> {
-    fn configure(&mut self, params: LedEffectParams) {
+impl<const N: usize> Effect<N> for Polyrhythm<N> {
+    fn configure(&mut self, params: Params) {
         self.start_color = params.color1.into();
         self.end_color = params.color2.into();
         for i in 0..N {

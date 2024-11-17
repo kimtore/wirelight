@@ -17,7 +17,7 @@ use rust_mqtt::packet::v5::publish_packet::QualityOfService::*;
 use crate::rust_mqtt::client::client_config::MqttVersion;
 use core::fmt::Write as _;
 use core::str::FromStr;
-use crate::led::LedEffectParams;
+use crate::effect::Params;
 use crate::mqtt::Error::MqttPublish;
 
 const RX_BUFFER_SIZE: usize = 16384;
@@ -92,7 +92,7 @@ impl MqttResponse {
 #[derive(Debug, Default, Copy, Clone)]
 struct ServerState {
     effect: Effect,
-    led_effect_params: LedEffectParams,
+    led_effect_params: Params,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -105,9 +105,9 @@ pub enum Effect {
 }
 
 #[derive(Debug)]
-pub enum LedEffectCommand {
+pub enum EffectCommand {
     ChangeEffect(Effect),
-    ConfigureParams(LedEffectParams),
+    ConfigureParams(Params),
 }
 
 enum Error {
@@ -121,7 +121,7 @@ enum Error {
 #[embassy_executor::task]
 pub async fn mqtt_task(
     stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
-    mut queue: spsc::Producer<'static, LedEffectCommand, 16>,
+    mut queue: spsc::Producer<'static, EffectCommand, 16>,
 ) {
     loop {
         if !stack.is_link_up() {
@@ -238,7 +238,7 @@ pub async fn mqtt_task(
 async fn mqtt_process_message<'a, T, const MAX_PROPERTIES: usize, R>(
     client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
     state: &mut ServerState,
-    queue: &mut spsc::Producer<'static, LedEffectCommand, 16>,
+    queue: &mut spsc::Producer<'static, EffectCommand, 16>,
 ) -> Result<(), Error>
 where
     T: Read + Write,
@@ -273,12 +273,12 @@ where
         }
         "led/pallet/effect/set" => {
             state.effect = message.parse_effect().ok_or(ParseParameter)?;
-            let _ = queue.enqueue(LedEffectCommand::ChangeEffect(state.effect));
+            let _ = queue.enqueue(EffectCommand::ChangeEffect(state.effect));
         }
         _ => return Err(InvalidTopic)
     };
 
-    let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
+    let _ = queue.enqueue(EffectCommand::ConfigureParams(state.led_effect_params));
     info!("Update: {:?}", state);
 
     mqtt_publish_state(client, "led/pallet/color1", MqttResponse::RGB(state.led_effect_params.color1)).await?;

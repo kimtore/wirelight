@@ -2,12 +2,12 @@
 #![no_main]
 
 pub mod rust_mqtt;
-pub mod led;
+pub mod effect;
 pub mod color;
 pub mod mqtt;
 mod config;
 
-use crate::led::{LedEffect, LedEffectParams};
+use crate::effect::{Effect, Params};
 use crate::config::*;
 use embassy_executor::Spawner;
 use esp_backtrace as _;
@@ -27,7 +27,6 @@ use heapless::{spsc};
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
-use crate::mqtt::{Effect, LedEffectCommand};
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -38,7 +37,7 @@ async fn main(spawner: Spawner) {
     static CLOCKS: StaticCell<Clocks> = StaticCell::new();
     static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
     static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
-    static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 16>> = StaticCell::new();
+    static COMMAND_QUEUE: StaticCell<spsc::Queue::<mqtt::EffectCommand, 16>> = StaticCell::new();
 
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
@@ -88,12 +87,12 @@ async fn main(spawner: Spawner) {
     );
 
     let command_queue: &'static mut _ = COMMAND_QUEUE.init(
-        spsc::Queue::<LedEffectCommand, 16>::new()
+        spsc::Queue::<mqtt::EffectCommand, 16>::new()
     );
 
     let (mut producer, consumer) = command_queue.split();
 
-    let _ = producer.enqueue(LedEffectCommand::ChangeEffect(Effect::Rainbow));
+    let _ = producer.enqueue(mqtt::EffectCommand::ChangeEffect(mqtt::Effect::Rainbow));
 
     spawner.must_spawn(wifi_task(wifi_controller));
     spawner.must_spawn(net_task(network_stack));
@@ -166,7 +165,7 @@ async fn led_task(
     pin: GpioPin<8>,
     dma: esp_hal::peripherals::DMA,
     clocks: &'static Clocks<'static>,
-    mut queue: spsc::Consumer<'static, LedEffectCommand, 16>,
+    mut queue: spsc::Consumer<'static, mqtt::EffectCommand, 16>,
 ) {
     info!("LED task started.");
     info!("Setting up DMA buffers.");
@@ -206,8 +205,8 @@ async fn led_task(
 
     use static_box::Box;
     let mut mem = [0_u8; 4096];
-    let mut effect: Box<dyn LedEffect<LED_COUNT>> = Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::default());
-    let mut state = LedEffectParams::default();
+    let mut effect: Box<dyn Effect<LED_COUNT>> = Box::new(&mut mem, effect::Polyrhythm::<LED_COUNT>::default());
+    let mut state = Params::default();
 
     loop {
         let Some(command) = queue.dequeue() else {
@@ -216,17 +215,17 @@ async fn led_task(
         };
 
         match command {
-            LedEffectCommand::ChangeEffect(eff) => {
+            mqtt::EffectCommand::ChangeEffect(eff) => {
                 drop(effect);
                 effect = match eff {
-                    Effect::Solid => Box::new(&mut mem, led::Solid::<LED_COUNT>::default()),
-                    Effect::Rainbow => Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default()),
-                    Effect::Gradient => Box::new(&mut mem, led::Gradient::<LED_COUNT>::default()),
-                    Effect::Polyrhythm => Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::default()),
+                    mqtt::Effect::Solid => Box::new(&mut mem, effect::Solid::<LED_COUNT>::default()),
+                    mqtt::Effect::Rainbow => Box::new(&mut mem, effect::Rainbow::<LED_COUNT>::default()),
+                    mqtt::Effect::Gradient => Box::new(&mut mem, effect::Gradient::<LED_COUNT>::default()),
+                    mqtt::Effect::Polyrhythm => Box::new(&mut mem, effect::Polyrhythm::<LED_COUNT>::default()),
                 };
                 effect.configure(state.clone());
             }
-            LedEffectCommand::ConfigureParams(new_state) => {
+            mqtt::EffectCommand::ConfigureParams(new_state) => {
                 state = new_state;
                 effect.configure(state.clone());
             }
