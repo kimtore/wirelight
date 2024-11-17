@@ -191,7 +191,7 @@ impl From<HCL> for CIELUV {
     }
 }
 
-/// Cylindrical representation of the CIELUV color space.
+/// CIELCh, also known as HCL, is a cylindrical representation of the CIELUV color space.
 ///
 /// * `h` is the hue, ranging from `0.0..360.0`,
 /// * `c` is the chromaticity, ranging from `0.0..1.0`, and
@@ -205,12 +205,14 @@ pub struct HCL {
 }
 
 /// Helper function to perform linear interpolation
+#[inline]
 pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
 }
 
 /// Convert sRGB to linear RGB (inverse sRGB companding)
 /// Verified here: http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
+#[inline]
 fn srgb_to_linear(c: f32) -> f32 {
     if c <= 0.04045 {
         c / 12.92
@@ -221,6 +223,7 @@ fn srgb_to_linear(c: f32) -> f32 {
 
 /// Convert linear RGB to sRGB
 /// Verified here: http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_RGB.html
+#[inline]
 fn linear_to_srgb(c: f32) -> f32 {
     if c <= 0.0031308 {
         12.92 * c
