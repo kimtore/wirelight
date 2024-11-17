@@ -18,7 +18,6 @@ use crate::rust_mqtt::client::client_config::MqttVersion;
 use core::fmt::Write as _;
 use core::str::FromStr;
 use crate::effect::Params;
-use crate::mqtt::Error::MqttPublish;
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
@@ -302,5 +301,5 @@ where
     R: RngCore,
 {
     let payload = payload.serialize().ok_or(Error::Serialize)?;
-    client.send_message(topic, payload.as_bytes(), QoS0, false).await.map_err(MqttPublish)
+    client.send_message(topic, payload.as_bytes(), QoS0, false).await.map_err(Error::MqttPublish)
 }

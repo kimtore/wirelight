@@ -1,0 +1,20 @@
+# vi: se ft=sh:
+#
+# Sample configuration file for NULED.
+
+# WiFi parameters.
+# Only WPA2 and WPA3 are supported.
+NULED_WIFI_SSID=""
+NULED_WIFI_PASSWORD=""
+
+# MQTT parameters.
+# Server must support unencrypted traffic and MQTTv5.
+NULED_MQTT_SERVER=""
+NULED_MQTT_PORT=1883
+NULED_MQTT_USERNAME=""
+NULED_MQTT_PASSWORD=""
+
+# How many LEDs in your LED strip.
+NULED_LED_COUNT=30
+
+export NULED_WIFI_SSID NULED_WIFI_PASSWORD NULED_MQTT_SERVER NULED_MQTT_PORT NULED_MQTT_USERNAME NULED_MQTT_PASSWORD NULED_LED_COUNT

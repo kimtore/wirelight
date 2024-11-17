@@ -1,3 +1,6 @@
+/// NULED configuration.
+/// All variables must be known at compile time.
+
 pub const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 pub const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 pub const MQTT_SERVER: &'static str = env!("NULED_MQTT_SERVER");
