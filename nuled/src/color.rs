@@ -31,12 +31,14 @@ impl From<XYZ> for RGB {
     }
 }
 
+/// Conversions to and from CIELUV/RGB is done through the XYZ color space.
 impl From<CIELUV> for RGB {
     fn from(cieluv: CIELUV) -> Self {
         XYZ::from(cieluv).into()
     }
 }
 
+/// Conversions to and from HCL/RGB is done via the CIELUV color space.
 impl From<HCL> for RGB {
     fn from(hcl: HCL) -> Self {
         CIELUV::from(hcl).into()
@@ -181,6 +183,12 @@ impl From<CIELUV> for XYZ {
     }
 }
 
+/// Represents a color using the CIE 1976 L*, u*, v* color space.
+///
+/// * `l` is the luminance,
+/// * `u` is the horizontal axis (green/red) and,
+/// * `v` is the vertical axis (blue/yellow).
+///
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CIELUV {
     l: f32,
@@ -189,7 +197,7 @@ pub struct CIELUV {
 }
 
 impl CIELUV {
-    /// Interpolate between two CIELUV colors based on a parameter `t` (0.0 to 1.0).
+    /// Interpolate between two colors based on a parameter `t` (0.0 to 1.0).
     /// `t = 0.0` returns the start color, `t = 1.0` returns the end color.
     pub fn interpolate(&self, end: &Self, t: f32) -> Self {
         Self {
@@ -226,6 +234,7 @@ impl From<XYZ> for CIELUV {
     }
 }
 
+/// Conversions to and from CIELUV/RGB is done through the XYZ color space.
 impl From<RGB> for CIELUV {
     fn from(rgb: RGB) -> Self {
         XYZ::from(rgb).into()
@@ -241,7 +250,12 @@ impl From<HCL> for CIELUV {
     }
 }
 
-/// Hue, chroma, luminance.
+/// Cylindrical representation of the CIELUV color space.
+///
+/// * `h` is the hue,
+/// * `c` is the chromaticity, and
+/// * `l` is the luminance.
+///
 /// https://cscheid.github.io/lux/demos/hcl/hcl.html
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HCL {

@@ -33,3 +33,10 @@ To flash your ESP32 chip:
 ```shell
 espflash flash --monitor target/riscv32imc-unknown-none-elf/release/nuled
 ```
+
+## Further reading
+* https://cscheid.github.io/lux/demos/hcl/hcl.html
+* https://hackaday.com/2018/03/30/color-spaces-the-model-at-the-end-of-the-rainbow/
+* https://howaboutanorange.com/blog/2011/08/10/color_interpolation/
+* https://en.wikipedia.org/wiki/SRGB
+* https://en.wikipedia.org/wiki/Colorfulness
