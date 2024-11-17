@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
 
-pub mod rust_mqtt;
-pub mod effect;
-pub mod color;
-pub mod mqtt;
+mod rust_mqtt;
+mod effect;
+mod color;
+mod mqtt;
 mod config;
 
 use crate::effect::{Effect, Params};

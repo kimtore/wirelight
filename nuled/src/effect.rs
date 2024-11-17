@@ -2,13 +2,11 @@ use core::convert::Into;
 use num_traits::float::Float;
 use crate::color::{lerp, CIELUV, HCL, RGB};
 
-/// One degree through a full circle, expressed in radians.
-const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
-
-/// Global LED params.
+/// Global LED params applicable to all effects implementing the Effect trait.
 ///
-/// To make the OpenHAB API extremely simple, we define a set of common parameters.
-/// Effects may use as many as these as they need.
+/// To make the API extremely simple, we define a set of common parameters.
+/// Effects may use as many as these as they need, but are encouraged to
+/// use all of them.
 #[derive(Copy, Clone, Debug)]
 pub struct Params {
     pub color1: RGB,
@@ -32,25 +30,27 @@ impl Default for Params {
     }
 }
 
-pub trait Effect<const N: usize>: Iterator<Item=Strip<N>> {
+/// Implement the Effect trait to create new LED effects.
+pub trait Effect<const N: usize>: Iterator<Item=RgbArray<N>> {
     fn configure(&mut self, params: Params);
 }
 
-pub struct Strip<const N: usize>(pub [RGB; N]);
+/// This type holds a string of RGB values and is the return type of all effect iterators.
+pub struct RgbArray<const N: usize>(pub [RGB; N]);
 
-impl<const N: usize> Strip<N> {
+impl<const N: usize> RgbArray<N> {
     pub fn to_rgb8(self) -> [smart_leds::RGB8; N] {
         self.0.map(|x| x.into())
     }
 }
 
-impl<const N: usize> Default for Strip<N> {
+impl<const N: usize> Default for RgbArray<N> {
     fn default() -> Self {
         Self::fill(RGB::default())
     }
 }
 
-impl<const N: usize> Strip<N> {
+impl<const N: usize> RgbArray<N> {
     fn fill(pixel: impl Into<RGB>) -> Self {
         Self([pixel.into(); N])
     }
@@ -77,10 +77,10 @@ impl<const N: usize> Effect<N> for Rainbow<N> {
 }
 
 impl<const N: usize> Iterator for Rainbow<N> {
-    type Item = Strip<N>;
+    type Item = RgbArray<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut strip = Strip::<N>::default();
+        let mut strip = RgbArray::<N>::default();
         for i in 0..N {
             strip.0[i] = HCL {
                 h: self.degrees + self.separation * i as f32,
@@ -100,15 +100,6 @@ pub struct Solid<const N: usize> {
     finished: bool,
 }
 
-impl<const N: usize> Solid<N> {
-    pub fn new(color: RGB) -> Self {
-        Self {
-            color,
-            finished: false,
-        }
-    }
-}
-
 impl<const N: usize> Effect<N> for Solid<N> {
     fn configure(&mut self, params: Params) {
         self.color = params.color1;
@@ -117,14 +108,14 @@ impl<const N: usize> Effect<N> for Solid<N> {
 }
 
 impl<const N: usize> Iterator for Solid<N> {
-    type Item = Strip<N>;
+    type Item = RgbArray<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.finished {
             return None;
         }
         self.finished = true;
-        Some(Strip::fill(self.color))
+        Some(RgbArray::fill(self.color))
     }
 }
 
@@ -161,10 +152,10 @@ impl<const N: usize> Effect<N> for Gradient<N> {
 }
 
 impl<const N: usize> Iterator for Gradient<N> {
-    type Item = Strip<N>;
+    type Item = RgbArray<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut strip = Strip::<N>::default();
+        let mut strip = RgbArray::<N>::default();
         for i in 0..N {
             let angle = self.angle + self.spread * i as f32;
             let amplitude = amplitude_to_factor(angle.to_radians().sin());
@@ -196,6 +187,9 @@ impl<const N: usize> Default for Polyrhythm<N> {
 
 impl<const N: usize> Effect<N> for Polyrhythm<N> {
     fn configure(&mut self, params: Params) {
+        /// One degree through a full circle, expressed in radians.
+        const ONE_DEGREE_RAD: f32 = core::f32::consts::TAU / 360.0;
+
         self.start_color = params.color1.into();
         self.end_color = params.color2.into();
         for i in 0..N {
@@ -206,10 +200,10 @@ impl<const N: usize> Effect<N> for Polyrhythm<N> {
 }
 
 impl<const N: usize> Iterator for Polyrhythm<N> {
-    type Item = Strip<N>;
+    type Item = RgbArray<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut strip = Strip::<N>::default();
+        let mut strip = RgbArray::<N>::default();
         for i in 0..N {
             // translate the range from -1.0..1.0 to 0.0..1.0.
             let amplitude = amplitude_to_factor(self.spinners[i].amplitude());

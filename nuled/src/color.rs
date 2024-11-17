@@ -251,37 +251,6 @@ pub struct HCL {
     pub l: f32,
 }
 
-impl HCL {
-    /// Convert HCL directly to XYZ without using the CIELUV space.
-    /// Minimal intermediary calculations reduce computational overhead.
-    ///
-    /// FIXME: this is not working as it should
-    ///
-    /// ## Simplifications:
-    ///
-    /// This algorithm skips a full CIELUV calculation and uses direct approximations for chromatic components.
-    /// Lightness (L∗) is mapped directly to Y, while chromatic components (u′, v′) influence X and Z.
-    pub fn to_xyz_fast(&self) -> XYZ {
-        // Convert H to radians
-        let h_rad = self.h.to_radians();
-
-        // Compute chromatic components u' and v'
-        let u = self.c * h_rad.cos();
-        let v = self.c * h_rad.sin();
-
-        // Convert to XYZ space
-        let y = if self.l > 7.999_592 { ((self.l + 16.0) / 116.0).powi(3) } else { self.l / 903.3 };
-        let x = y + u / 13.0 / (self.l / 116.0);
-        let z = y - v / 13.0 / (self.l / 116.0);
-
-        XYZ { x, y, z }
-    }
-
-    pub fn to_rgb_fast(&self) -> RGB {
-        self.to_xyz_fast().into()
-    }
-}
-
 /// Helper function to perform linear interpolation
 pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + t * (end - start)
