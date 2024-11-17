@@ -3,7 +3,7 @@ use crate::rust_mqtt::{
     client::client_config::ClientConfig,
     utils::rng_generator::CountingRng,
 };
-use crate::{rust_mqtt, Effect, LedEffectCommand, ServerState};
+use crate::rust_mqtt;
 use crate::config::*;
 use embassy_net::dns;
 use embassy_net::tcp::TcpSocket;
@@ -17,6 +17,7 @@ use rust_mqtt::packet::v5::publish_packet::QualityOfService::*;
 use crate::rust_mqtt::client::client_config::MqttVersion;
 use core::fmt::Write as _;
 use core::str::FromStr;
+use crate::led::LedEffectParams;
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
@@ -86,6 +87,38 @@ impl MqttMessage<'_> {
 
         u8::from_str(number_string.as_str()).ok()
     }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+struct ServerState {
+    effect: Effect,
+    led_effect_params: LedEffectParams,
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub enum Effect {
+    Solid,
+    #[default]
+    Rainbow,
+    Gradient,
+    Polyrhythm,
+}
+
+impl Effect {
+    pub fn serialize(&self) -> &'static str {
+        match self {
+            Effect::Solid => "solid",
+            Effect::Rainbow => "rainbow",
+            Effect::Polyrhythm => "polyrhythm",
+            Effect::Gradient => "gradient",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum LedEffectCommand {
+    ChangeEffect(Effect),
+    ConfigureParams(LedEffectParams),
 }
 
 enum Error {

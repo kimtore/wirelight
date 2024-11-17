@@ -27,49 +27,18 @@ use heapless::{spsc};
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
-
-static CLOCKS: StaticCell<Clocks> = StaticCell::new();
-static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
-static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
-static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 16>> = StaticCell::new();
-
-#[derive(Debug, Default, Copy, Clone)]
-struct ServerState {
-    effect: Effect,
-    led_effect_params: LedEffectParams,
-}
-
-#[derive(Debug, Default, Copy, Clone)]
-enum Effect {
-    Solid,
-    #[default]
-    Rainbow,
-    Gradient,
-    Polyrhythm,
-}
-
-impl Effect {
-    fn serialize(&self) -> &'static str {
-        match self {
-            Effect::Solid => "solid",
-            Effect::Rainbow => "rainbow",
-            Effect::Polyrhythm => "polyrhythm",
-            Effect::Gradient => "gradient",
-        }
-    }
-}
-
-#[derive(Debug)]
-enum LedEffectCommand {
-    ChangeEffect(Effect),
-    ConfigureParams(LedEffectParams),
-}
+use crate::mqtt::{Effect, LedEffectCommand};
 
 #[main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger(log::LevelFilter::Info);
 
     info!("NULED booting.");
+
+    static CLOCKS: StaticCell<Clocks> = StaticCell::new();
+    static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
+    static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
+    static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 16>> = StaticCell::new();
 
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
