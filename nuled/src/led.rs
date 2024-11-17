@@ -24,9 +24,9 @@ impl Default for LedEffectParams {
         Self {
             color1: RGB::default(),
             color2: RGB::default(),
-            chroma: 0.75,
-            luminance: 0.5,
-            size: 1.0,
+            chroma: 0.6,
+            luminance: 0.6,
+            size: 0.5,
             speed: 0.5,
         }
     }
@@ -57,6 +57,7 @@ impl<const N: usize> Strip<N> {
 }
 
 /// Circle through the HCL color space for rainbow colors.
+#[derive(Default)]
 pub struct Rainbow<const N: usize> {
     chroma: f32,
     luminance: f32,
@@ -66,24 +67,12 @@ pub struct Rainbow<const N: usize> {
     separation: f32,
 }
 
-impl<const N: usize> Default for Rainbow<N> {
-    fn default() -> Self {
-        Self {
-            chroma: 0.0,
-            luminance: 0.0,
-            degrees: 0.0,
-            degree_velocity: 1.0,
-            separation: 360.0 / N as f32,
-        }
-    }
-}
-
 impl<const N: usize> LedEffect<N> for Rainbow<N> {
     fn configure(&mut self, params: LedEffectParams) {
         self.chroma = params.chroma;
         self.luminance = params.luminance;
         self.degree_velocity = lerp(0.0, 3.0, params.speed);
-        self.separation = lerp(0.0, 360.0 / N as f32, params.size);
+        self.separation = lerp(0.0, 360.0 / N as f32, 1.0 - params.size);
     }
 }
 
@@ -101,10 +90,6 @@ impl<const N: usize> Iterator for Rainbow<N> {
         }
         self.degrees += self.degree_velocity;
         Some(strip)
-        //let color = color.to_rgb_fast();
-        //let rgb_color: RGB = color.into();
-        //info!("{color:?} -> {rgb_color:?}");
-        //Some(Strip::fill(color))
     }
 }
 
@@ -153,13 +138,8 @@ pub struct Polyrhythm<const N: usize> {
 
 impl<const N: usize> Default for Polyrhythm<N> {
     fn default() -> Self {
-        let mut spinners = [Spinner::default(); N];
-        for i in 0..N {
-            spinners[i].angle = (ONE_DEGREE_RAD / 6.0) * i as f32;
-            spinners[i].angular_velocity = (ONE_DEGREE_RAD / 6.0) * ((i + 1) as f32);
-        }
         Self {
-            spinners,
+            spinners: [Spinner::default(); N],
             start_color: CIELUV::default(),
             end_color: CIELUV::default(),
         }
@@ -170,6 +150,10 @@ impl<const N: usize> LedEffect<N> for Polyrhythm<N> {
     fn configure(&mut self, params: LedEffectParams) {
         self.start_color = params.color1.into();
         self.end_color = params.color2.into();
+        for i in 0..N {
+            let max_velocity = (ONE_DEGREE_RAD / 5.0) * ((i + 1) as f32);
+            self.spinners[i].angular_velocity = lerp(0.0, max_velocity, params.speed);
+        }
     }
 }
 
