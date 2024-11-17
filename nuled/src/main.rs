@@ -51,6 +51,7 @@ enum Effect {
     Solid,
     #[default]
     Rainbow,
+    Gradient,
     Polyrhythm,
 }
 
@@ -60,6 +61,7 @@ impl Effect {
             Effect::Solid => "solid",
             Effect::Rainbow => "rainbow",
             Effect::Polyrhythm => "polyrhythm",
+            Effect::Gradient => "gradient",
         }
     }
 }
@@ -256,6 +258,7 @@ async fn led_task(
                 effect = match eff {
                     Effect::Solid => Box::new(&mut mem, led::Solid::<LED_COUNT>::default()),
                     Effect::Rainbow => Box::new(&mut mem, led::Rainbow::<LED_COUNT>::default()),
+                    Effect::Gradient => Box::new(&mut mem, led::Gradient::<LED_COUNT>::default()),
                     Effect::Polyrhythm => Box::new(&mut mem, led::Polyrhythm::<LED_COUNT>::default()),
                 };
                 effect.configure(state.clone());
@@ -271,9 +274,9 @@ async fn led_task(
         // Run the current effect until it is exhausted, or the user has requested a new effect.
         while let Some(strip) = effect.next() {
             /// Maximum amount of time budget for one frame of animation.
-            /// 41.66ms corresponds to 24 frames per second, which is sufficient
+            /// 42ms corresponds to just below 24 frames per second, which is sufficient
             /// for the eye to not notice individual frames.
-            const EFFECT_RUNTIME_NOMINAL_USEC: i64 = 41666;
+            const EFFECT_RUNTIME_NOMINAL_MS: i64 = 42;
 
             // Maximum LED brightness regardless of other parameters.
             //const BRIGHTNESS: u8 = 127;
@@ -291,13 +294,13 @@ async fn led_task(
 
             let effect_runtime = (current_millis() - last_effect_millis) as i64;
             last_effect_millis = current_millis();
-            let sleep_time = EFFECT_RUNTIME_NOMINAL_USEC - 1000 * effect_runtime;
+            let sleep_time = EFFECT_RUNTIME_NOMINAL_MS - effect_runtime;
 
             if sleep_time.is_negative() {
-                warn!("Effect iteration took too long, {} us is above target of {EFFECT_RUNTIME_NOMINAL_USEC} us", effect_runtime*1000);
+                warn!("Effect iteration took too long, {effect_runtime} ms is above target of {EFFECT_RUNTIME_NOMINAL_MS} ms");
             }
 
-            let sleep_time = sleep_time.clamp(1, EFFECT_RUNTIME_NOMINAL_USEC) as u64;
+            let sleep_time = sleep_time.clamp(1, EFFECT_RUNTIME_NOMINAL_MS) as u64;
             debug!("Effect iteration took {effect_runtime} ms, yielding task for {sleep_time} ms");
 
             embassy_time::Timer::after_micros(sleep_time).await;

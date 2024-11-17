@@ -40,6 +40,7 @@ impl MqttMessage<'_> {
             "rainbow" => Some(Effect::Rainbow),
             "solid" => Some(Effect::Solid),
             "polyrhythm" => Some(Effect::Polyrhythm),
+            "gradient" => Some(Effect::Gradient),
             _ => None,
         }
     }

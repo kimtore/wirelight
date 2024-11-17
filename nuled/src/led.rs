@@ -71,7 +71,7 @@ impl<const N: usize> LedEffect<N> for Rainbow<N> {
     fn configure(&mut self, params: LedEffectParams) {
         self.chroma = params.chroma;
         self.luminance = params.luminance;
-        self.degree_velocity = lerp(0.0, 3.0, params.speed);
+        self.degree_velocity = lerp(0.0, 0.6, params.speed);
         self.separation = lerp(0.0, 360.0 / N as f32, 1.0 - params.size);
     }
 }
@@ -128,6 +128,54 @@ impl<const N: usize> Iterator for Solid<N> {
     }
 }
 
+/// Draw a gradient between two colors.
+pub struct Gradient<const N: usize> {
+    start_color: CIELUV,
+    end_color: CIELUV,
+    angle: f32,
+    /// Animation speed.
+    angular_velocity: f32,
+    /// Controls the amount of color difference from one pixel to the next.
+    spread: f32,
+}
+
+impl<const N: usize> Default for Gradient<N> {
+    fn default() -> Self {
+        Self {
+            angle: 0.0,
+            angular_velocity: 0.0,
+            spread: 0.0,
+            start_color: CIELUV::default(),
+            end_color: CIELUV::default(),
+        }
+    }
+}
+
+impl<const N: usize> LedEffect<N> for Gradient<N> {
+    fn configure(&mut self, params: LedEffectParams) {
+        self.start_color = params.color1.into();
+        self.end_color = params.color2.into();
+        self.angular_velocity = lerp(0.0, 0.33, params.speed);
+        self.spread = lerp(0.0, 360.0 / N as f32, 1.0 - params.size);
+    }
+}
+
+impl<const N: usize> Iterator for Gradient<N> {
+    type Item = Strip<N>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut strip = Strip::<N>::default();
+        for i in 0..N {
+            let angle = self.angle + self.spread * i as f32;
+            let amplitude = amplitude_to_factor(angle.to_radians().sin());
+            let interpolated = self.start_color.interpolate(&self.end_color, amplitude);
+            strip.0[i] = interpolated.into();
+        }
+        self.angle += self.angular_velocity;
+
+        Some(strip)
+    }
+}
 /// Fade LEDs in and out with a sine wave function.
 /// Each LED has a progressively smaller period size.
 pub struct Polyrhythm<const N: usize> {
@@ -151,7 +199,7 @@ impl<const N: usize> LedEffect<N> for Polyrhythm<N> {
         self.start_color = params.color1.into();
         self.end_color = params.color2.into();
         for i in 0..N {
-            let max_velocity = (ONE_DEGREE_RAD / 5.0) * ((i + 1) as f32);
+            let max_velocity = (ONE_DEGREE_RAD / 8.0) * ((i + 1) as f32);
             self.spinners[i].angular_velocity = lerp(0.0, max_velocity, params.speed);
         }
     }
@@ -164,7 +212,7 @@ impl<const N: usize> Iterator for Polyrhythm<N> {
         let mut strip = Strip::<N>::default();
         for i in 0..N {
             // translate the range from -1.0..1.0 to 0.0..1.0.
-            let amplitude = (1.0 + self.spinners[i].amplitude()) / 2.0;
+            let amplitude = amplitude_to_factor(self.spinners[i].amplitude());
             let interpolated = self.start_color.interpolate(&self.end_color, amplitude);
             if i == 0 {
                 debug!("Polyrhythm: {amplitude:.5} -> {:?}", interpolated);
@@ -191,4 +239,8 @@ impl Spinner {
     pub fn amplitude(&self) -> f32 {
         self.angle.sin()
     }
+}
+
+fn amplitude_to_factor(amplitude: f32) -> f32 {
+    (1.0 + amplitude) / 2.0
 }

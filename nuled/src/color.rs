@@ -22,9 +22,9 @@ impl From<XYZ> for RGB {
         let b = 0.0557101 * xyz.x - 0.2040211 * xyz.y + 1.0570959 * xyz.z;
 
         Self {
-            r: (linear_to_srgb(r) * 255.0).max(0.0).min(255.0),
-            g: (linear_to_srgb(g) * 255.0).max(0.0).min(255.0),
-            b: (linear_to_srgb(b) * 255.0).max(0.0).min(255.0),
+            r: (linear_to_srgb(r) * 255.0).clamp(0.0, 255.0),
+            g: (linear_to_srgb(g) * 255.0).clamp(0.0, 255.0),
+            b: (linear_to_srgb(b) * 255.0).clamp(0.0, 255.0),
         }
     }
 }
