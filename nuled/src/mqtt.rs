@@ -29,11 +29,16 @@ struct MqttMessage<'a>(&'a [u8]);
 
 impl MqttMessage<'_> {
     fn parse_rgb(&self) -> Option<RGB> {
-        let mut iter = self.0.iter();
-        let r = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        let g = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        let b = Self::parse_int_and_delimiter(&mut iter)? as f32;
-        Some(RGB { r, g, b })
+        let s = core::str::from_utf8(self.0).ok()?;
+        let mut parts= s.split(",");
+        let r = parts.next()?;
+        let g = parts.next()?;
+        let b = parts.next()?;
+        Some(RGB {
+            r: f32::from_str(r).ok()?,
+            g: f32::from_str(g).ok()?,
+            b: f32::from_str(b).ok()?,
+        })
     }
 
     fn parse_effect(&self) -> Option<Effect> {
@@ -57,35 +62,6 @@ impl MqttMessage<'_> {
         let mut s = String::new();
         write!(s, "{},{},{}", rgb.r, rgb.g, rgb.b).ok()?;
         Some(s)
-    }
-
-    /// Parse a single number up to three digits wide,
-    /// and optionally a comma separator, unless end of line is reached.
-    fn parse_int_and_delimiter<'a>(mut iter: impl Iterator<Item=&'a u8>) -> Option<u8> {
-        use core::str::FromStr;
-        use heapless::String;
-        let mut number_string = String::<3>::new();
-
-        loop {
-            let char = match iter.next() {
-                None => None,
-                Some(c) if *c as char == ',' => None,
-                Some(c) => Some(*c as char),
-            };
-
-            match char {
-                None => {
-                    break;
-                }
-                Some(char) => {
-                    if let Err(_) = number_string.push(char) {
-                        return None;
-                    };
-                }
-            }
-        }
-
-        u8::from_str(number_string.as_str()).ok()
     }
 }
 
