@@ -5,7 +5,9 @@
 
 use num_traits::Float;
 
-/// Red, green, blue.
+/// Represents a color in the sRGB color space.
+///
+/// Values in the range of 0.0..255.0.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct RGB {
     pub r: f32,

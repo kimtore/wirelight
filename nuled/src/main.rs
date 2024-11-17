@@ -29,11 +29,25 @@ use ws2812_spi::prerendered::Ws2812;
 const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
 const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
 const MQTT_SERVER: &'static str = env!("NULED_MQTT_SERVER");
-const MQTT_PORT: u16 = 1883; //env!("NULED_MQTT_PORT");
+const MQTT_PORT: u16 = must_parse_u16(env!("NULED_MQTT_PORT"));
 const MQTT_USERNAME: &'static str = env!("NULED_MQTT_USERNAME");
 const MQTT_PASSWORD: &'static str = env!("NULED_MQTT_PASSWORD");
 
-const LED_COUNT: usize = 29;
+const LED_COUNT: usize = must_parse_led_count(env!("NULED_LED_COUNT")) as usize;
+
+const fn must_parse_u16(s: &str) -> u16 {
+    match u16::from_str_radix(s, 10) {
+        Ok(val) => val,
+        Err(_) => panic!("value is not a number"),
+    }
+}
+
+const fn must_parse_led_count(s: &str) -> usize {
+    match must_parse_u16(s) {
+        0 => panic!("LED count must be greater than zero"),
+        x => x as usize,
+    }
+}
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
@@ -197,6 +211,7 @@ async fn wifi_task(
     }
 }
 
+/// The LED task is responsible for displaying data on the LED strip in a timely manner.
 #[embassy_executor::task]
 async fn led_task(
     spi: SPI2,
@@ -275,7 +290,8 @@ async fn led_task(
         while let Some(strip) = effect.next() {
             /// Maximum amount of time budget for one frame of animation.
             /// 42ms corresponds to just below 24 frames per second, which is sufficient
-            /// for the eye to not notice individual frames.
+            /// for the eye to not notice individual frames, while at the same time
+            /// allowing for effects that do expensive float computation.
             const EFFECT_RUNTIME_NOMINAL_MS: i64 = 42;
 
             // Maximum LED brightness regardless of other parameters.
