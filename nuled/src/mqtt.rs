@@ -18,6 +18,7 @@ use crate::rust_mqtt::client::client_config::MqttVersion;
 use core::fmt::Write as _;
 use core::str::FromStr;
 use crate::led::LedEffectParams;
+use crate::mqtt::Error::MqttPublish;
 
 const RX_BUFFER_SIZE: usize = 16384;
 const TX_BUFFER_SIZE: usize = 16384;
@@ -56,11 +57,34 @@ impl MqttMessage<'_> {
         let s = core::str::from_utf8(self.0).ok()?;
         f32::from_str(s).ok()
     }
+}
 
-    /// Produce a comma-separated value, suitable for OpenHAB.
-    fn serialize_rgb(rgb: &RGB) -> Option<String<11>> {
+enum MqttResponse {
+    RGB(RGB),
+    Effect(Effect),
+    Number(f32),
+}
+
+impl MqttResponse {
+    fn serialize<'a>(self) -> Option<String<32>> {
         let mut s = String::new();
-        write!(s, "{},{},{}", rgb.r, rgb.g, rgb.b).ok()?;
+        match self {
+            MqttResponse::RGB(rgb) => {
+                write!(s, "{},{},{}", rgb.r, rgb.g, rgb.b).ok()?;
+            }
+            MqttResponse::Effect(effect) => {
+                s.write_str(match effect {
+                    Effect::Solid => "solid",
+                    Effect::Rainbow => "rainbow",
+                    Effect::Polyrhythm => "polyrhythm",
+                    Effect::Gradient => "gradient",
+                }).ok()?;
+            }
+            MqttResponse::Number(num) => {
+                let mut buf = ryu::Buffer::new();
+                s.write_str(buf.format(num)).ok()?;
+            }
+        }
         Some(s)
     }
 }
@@ -80,17 +104,6 @@ pub enum Effect {
     Polyrhythm,
 }
 
-impl Effect {
-    pub fn serialize(&self) -> &'static str {
-        match self {
-            Effect::Solid => "solid",
-            Effect::Rainbow => "rainbow",
-            Effect::Polyrhythm => "polyrhythm",
-            Effect::Gradient => "gradient",
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum LedEffectCommand {
     ChangeEffect(Effect),
@@ -102,7 +115,7 @@ enum Error {
     MqttPublish(rust_mqtt::packet::v5::reason_codes::ReasonCode),
     InvalidTopic,
     ParseParameter,
-    SerializeRGB,
+    Serialize,
 }
 
 #[embassy_executor::task]
@@ -212,7 +225,7 @@ pub async fn mqtt_task(
                 Error::ParseParameter => {
                     error!("Unable to parse color or effect parameter from MQTT");
                 }
-                Error::SerializeRGB => {
+                Error::Serialize => {
                     error!("RGB serialization failed");
                 }
             }
@@ -220,7 +233,8 @@ pub async fn mqtt_task(
     }
 }
 
-/// Receive a message over MQTT, configure LEDs based on that, and report back the current state.
+/// Receive a valid message over any of the configured MQTT topics, configure LEDs based on that,
+/// and report back the current state.
 async fn mqtt_process_message<'a, T, const MAX_PROPERTIES: usize, R>(
     client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
     state: &mut ServerState,
@@ -267,52 +281,26 @@ where
     let _ = queue.enqueue(LedEffectCommand::ConfigureParams(state.led_effect_params));
     info!("Update: {:?}", state);
 
-    client.send_message(
-        "led/pallet/color1",
-        MqttMessage::serialize_rgb(&state.led_effect_params.color1)
-            .ok_or(SerializeRGB)?
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/color2",
-        MqttMessage::serialize_rgb(&state.led_effect_params.color2)
-            .ok_or(SerializeRGB)?
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/effect",
-        state.effect
-            .serialize()
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    let mut buf = ryu::Buffer::new();
-
-    client.send_message(
-        "led/pallet/chroma",
-        buf.format(state.led_effect_params.chroma)
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/speed",
-        buf.format(state.led_effect_params.speed)
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/size",
-        buf.format(state.led_effect_params.size)
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
-
-    client.send_message(
-        "led/pallet/luminance",
-        buf.format(state.led_effect_params.luminance)
-            .as_bytes(), QoS0, false,
-    ).await.map_err(MqttPublish)?;
+    mqtt_publish_state(client, "led/pallet/color1", MqttResponse::RGB(state.led_effect_params.color1)).await?;
+    mqtt_publish_state(client, "led/pallet/color2", MqttResponse::RGB(state.led_effect_params.color2)).await?;
+    mqtt_publish_state(client, "led/pallet/effect", MqttResponse::Effect(state.effect)).await?;
+    mqtt_publish_state(client, "led/pallet/chroma", MqttResponse::Number(state.led_effect_params.chroma)).await?;
+    mqtt_publish_state(client, "led/pallet/luminance", MqttResponse::Number(state.led_effect_params.luminance)).await?;
+    mqtt_publish_state(client, "led/pallet/size", MqttResponse::Number(state.led_effect_params.size)).await?;
+    mqtt_publish_state(client, "led/pallet/speed", MqttResponse::Number(state.led_effect_params.speed)).await?;
 
     Ok(())
+}
+
+async fn mqtt_publish_state<'a, T, const MAX_PROPERTIES: usize, R>(
+    client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
+    topic: &'static str,
+    payload: MqttResponse,
+) -> Result<(), Error>
+where
+    T: Read + Write,
+    R: RngCore,
+{
+    let payload = payload.serialize().ok_or(Error::Serialize)?;
+    client.send_message(topic, payload.as_bytes(), QoS0, false).await.map_err(MqttPublish)
 }
