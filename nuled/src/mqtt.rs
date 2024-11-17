@@ -3,7 +3,8 @@ use crate::rust_mqtt::{
     client::client_config::ClientConfig,
     utils::rng_generator::CountingRng,
 };
-use crate::{rust_mqtt, Effect, LedEffectCommand, ServerState, MQTT_PASSWORD, MQTT_PORT, MQTT_SERVER, MQTT_USERNAME};
+use crate::{rust_mqtt, Effect, LedEffectCommand, ServerState};
+use crate::config::*;
 use embassy_net::dns;
 use embassy_net::tcp::TcpSocket;
 use embassy_time::Duration;

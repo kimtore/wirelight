@@ -5,8 +5,10 @@ pub mod rust_mqtt;
 pub mod led;
 pub mod color;
 pub mod mqtt;
+mod config;
 
 use crate::led::{LedEffect, LedEffectParams};
+use crate::config::*;
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::clock::{ClockControl, Clocks};
@@ -25,29 +27,6 @@ use heapless::{spsc};
 use smart_leds::SmartLedsWrite;
 use static_cell::StaticCell;
 use ws2812_spi::prerendered::Ws2812;
-
-const WIFI_SSID: &'static str = env!("NULED_WIFI_SSID");
-const WIFI_PASSWORD: &'static str = env!("NULED_WIFI_PASSWORD");
-const MQTT_SERVER: &'static str = env!("NULED_MQTT_SERVER");
-const MQTT_PORT: u16 = must_parse_u16(env!("NULED_MQTT_PORT"));
-const MQTT_USERNAME: &'static str = env!("NULED_MQTT_USERNAME");
-const MQTT_PASSWORD: &'static str = env!("NULED_MQTT_PASSWORD");
-
-const LED_COUNT: usize = must_parse_led_count(env!("NULED_LED_COUNT")) as usize;
-
-const fn must_parse_u16(s: &str) -> u16 {
-    match u16::from_str_radix(s, 10) {
-        Ok(val) => val,
-        Err(_) => panic!("value is not a number"),
-    }
-}
-
-const fn must_parse_led_count(s: &str) -> usize {
-    match must_parse_u16(s) {
-        0 => panic!("LED count must be greater than zero"),
-        x => x as usize,
-    }
-}
 
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
