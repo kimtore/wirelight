@@ -38,7 +38,7 @@ const LED_COUNT: usize = 29;
 static CLOCKS: StaticCell<Clocks> = StaticCell::new();
 static NETWORK_STACK: StaticCell<embassy_net::Stack<esp_wifi::wifi::WifiDevice<'_, esp_wifi::wifi::WifiStaDevice>>> = StaticCell::new();
 static NETWORK_STACK_MEMORY: StaticCell<embassy_net::StackResources<3>> = StaticCell::new();
-static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 4>> = StaticCell::new();
+static COMMAND_QUEUE: StaticCell<spsc::Queue::<LedEffectCommand, 16>> = StaticCell::new();
 
 #[derive(Debug, Default, Copy, Clone)]
 struct ServerState {
@@ -124,7 +124,7 @@ async fn main(spawner: Spawner) {
     );
 
     let command_queue: &'static mut _ = COMMAND_QUEUE.init(
-        spsc::Queue::<LedEffectCommand, 4>::new()
+        spsc::Queue::<LedEffectCommand, 16>::new()
     );
 
     let (mut producer, consumer) = command_queue.split();
@@ -201,7 +201,7 @@ async fn led_task(
     pin: GpioPin<8>,
     dma: esp_hal::peripherals::DMA,
     clocks: &'static Clocks<'static>,
-    mut queue: spsc::Consumer<'static, LedEffectCommand, 4>,
+    mut queue: spsc::Consumer<'static, LedEffectCommand, 16>,
 ) {
     info!("LED task started.");
     info!("Setting up DMA buffers.");

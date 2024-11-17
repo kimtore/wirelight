@@ -97,7 +97,7 @@ enum Error {
 #[embassy_executor::task]
 pub async fn mqtt_task(
     stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
-    mut queue: spsc::Producer<'static, LedEffectCommand, 4>,
+    mut queue: spsc::Producer<'static, LedEffectCommand, 16>,
 ) {
     loop {
         if !stack.is_link_up() {
@@ -213,7 +213,7 @@ pub async fn mqtt_task(
 async fn mqtt_process_message<'a, T, const MAX_PROPERTIES: usize, R>(
     client: &mut MqttClient<'a, T, MAX_PROPERTIES, R>,
     state: &mut ServerState,
-    queue: &mut spsc::Producer<'static, LedEffectCommand, 4>,
+    queue: &mut spsc::Producer<'static, LedEffectCommand, 16>,
 ) -> Result<(), Error>
 where
     T: Read + Write,
