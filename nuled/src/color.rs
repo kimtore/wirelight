@@ -8,6 +8,10 @@ use num_traits::Float;
 /// Represents a color in the sRGB color space.
 ///
 /// Values in the range of 0.0..255.0.
+///
+/// * `r` is the amount of red,
+/// * `g` is the amount of green,
+/// * `b` is the amount of blue.
 #[derive(Default, Debug, Clone, Copy)]
 pub struct RGB {
     pub r: f32,
@@ -55,78 +59,15 @@ impl Into<smart_leds::RGB8> for RGB {
     }
 }
 
-/// Hue, saturation, value.
-#[derive(Default, Debug, Clone, Copy)]
-pub struct HSV {
-    pub hue: u8,
-    pub sat: u8,
-    pub val: u8,
-}
-
-/// From the smart_leds crate.
+/// CIE 1931 XYZ color space, derived from CIE RGB in an effort to simplify the math.
+/// This color space defines the relationship between the visible spectrum
+/// and the visual sensation of specific colors by human color vision.
 ///
-/// Converts a hsv value into RGB values. Because the hsv values are integers, the precision of the
-/// resulting RGB value is limited to ±4.
+/// Values in the range of 0.0..1.0.
 ///
-/// NOTE: Since most led protocols & their implementations are very timing
-/// sensitive, it's advisable to do the conversion before `write`-ing.
-///
-/// # Example
-/// ```
-/// use led::{hsv2rgb, Hsv};
-/// let hsv = Hsv{hue: 89, sat: 230, val: 42};
-/// let conv_rgb = hsv2rgb(hsv);
-/// // will return RGB { r: 4, g: 41, b: 8},
-/// ```
-impl Into<RGB> for HSV {
-    fn into(self) -> RGB {
-        let v: u16 = self.val as u16;
-        let s: u16 = self.sat as u16;
-        let f: u16 = (self.hue as u16 * 2 % 85) * 3; // relative interval
-
-        let p: u16 = v * (255 - s) / 255;
-        let q: u16 = v * (255 - (s * f) / 255) / 255;
-        let t: u16 = v * (255 - (s * (255 - f)) / 255) / 255;
-        match self.hue {
-            0..=42 => RGB {
-                r: v as f32,
-                g: t as f32,
-                b: p as f32,
-            },
-            43..=84 => RGB {
-                r: q as f32,
-                g: v as f32,
-                b: p as f32,
-            },
-            85..=127 => RGB {
-                r: p as f32,
-                g: v as f32,
-                b: t as f32,
-            },
-            128..=169 => RGB {
-                r: p as f32,
-                g: q as f32,
-                b: v as f32,
-            },
-            170..=212 => RGB {
-                r: t as f32,
-                g: p as f32,
-                b: v as f32,
-            },
-            213..=254 => RGB {
-                r: v as f32,
-                g: p as f32,
-                b: q as f32,
-            },
-            255 => RGB {
-                r: v as f32,
-                g: t as f32,
-                b: p as f32,
-            },
-        }
-    }
-}
-
+/// * `x` is a mix of all three RGB curves chosen to be nonnegative,
+/// * `y` is the luminance, and
+/// * `z` is quasi-equal to blue (from CIE RGB).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct XYZ {
     x: f32,
@@ -185,9 +126,9 @@ impl From<CIELUV> for XYZ {
 
 /// Represents a color using the CIE 1976 L*, u*, v* color space.
 ///
-/// * `l` is the luminance,
-/// * `u` is the horizontal axis (green/red) and,
-/// * `v` is the vertical axis (blue/yellow).
+/// * `l` is the luminance, with values `0.0..1.0`,
+/// * `u` is the horizontal axis (green/red), with values approximately `-1.34..2.24`, and
+/// * `v` is the vertical axis (blue/yellow), with values approximately `-1.40..1.22`.
 ///
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CIELUV {
@@ -252,14 +193,12 @@ impl From<HCL> for CIELUV {
 
 /// Cylindrical representation of the CIELUV color space.
 ///
-/// * `h` is the hue,
-/// * `c` is the chromaticity, and
-/// * `l` is the luminance.
+/// * `h` is the hue, ranging from `0.0..360.0`,
+/// * `c` is the chromaticity, ranging from `0.0..1.0`, and
+/// * `l` is the luminance, ranging from `0.0..1.0`.
 ///
-/// https://cscheid.github.io/lux/demos/hcl/hcl.html
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HCL {
-    /// Hue in degrees, 0.0..360.0.
     pub h: f32,
     pub c: f32,
     pub l: f32,
