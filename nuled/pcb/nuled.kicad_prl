@@ -1,10 +1,16 @@
 {
   "board": {
-    "active_layer": 0,
+    "active_layer": 49,
     "active_layer_preset": "All Layers",
     "auto_track_width": false,
-    "hidden_netclasses": [],
-    "hidden_nets": [],
+    "hidden_netclasses": [
+      "+5V high current"
+    ],
+    "hidden_nets": [
+      "GND",
+      "+5V",
+      "/VBUS_IN"
+    ],
     "high_contrast_mode": 0,
     "net_color_mode": 1,
     "opacity": {
