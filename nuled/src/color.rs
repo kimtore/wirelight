@@ -59,6 +59,19 @@ impl Into<smart_leds::RGB8> for RGB {
     }
 }
 
+type RGBW = smart_leds::RGBW<u8,u8>;
+
+impl Into<RGBW> for RGB {
+    fn into(self) -> RGBW {
+        RGBW {
+            r: self.r.round() as u8,
+            g: self.g.round() as u8,
+            b: self.b.round() as u8,
+            a: smart_leds::White(0),
+        }
+    }
+}
+
 /// CIE 1931 XYZ color space, derived from CIE RGB in an effort to simplify the math.
 /// This color space defines the relationship between the visible spectrum
 /// and the visual sensation of specific colors by human color vision.

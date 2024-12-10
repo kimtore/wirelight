@@ -39,7 +39,12 @@ pub trait Effect<const N: usize>: Iterator<Item=RgbArray<N>> {
 pub struct RgbArray<const N: usize>(pub [RGB; N]);
 
 impl<const N: usize> RgbArray<N> {
+    #[allow(dead_code)]
     pub fn to_rgb8(self) -> [smart_leds::RGB8; N] {
+        self.0.map(|x| x.into())
+    }
+
+    pub fn to_rgbw(self) -> [smart_leds::RGBW<u8, u8>; N] {
         self.0.map(|x| x.into())
     }
 }

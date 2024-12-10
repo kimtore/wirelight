@@ -7,6 +7,7 @@ mod color;
 mod mqtt;
 mod config;
 
+use core::str::FromStr;
 use crate::effect::{Effect, Params};
 use crate::config::*;
 use embassy_executor::Spawner;
@@ -30,7 +31,10 @@ use ws2812_spi::prerendered::Ws2812;
 
 #[main]
 async fn main(spawner: Spawner) {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    // Default to INFO level logging unless RUST_LOG=trace|debug|...
+    let log_level = option_env!("NULED_LOG_LEVEL").unwrap_or_default();
+    let log_level = log::LevelFilter::from_str(log_level).unwrap_or_else(|_| log::LevelFilter::Info);
+    esp_println::logger::init_logger(log_level);
 
     info!("NULED booting.");
 
@@ -180,13 +184,14 @@ async fn led_task(
     let tx_dma = esp_hal::dma::DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
     let rx_dma = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 
-    info!("Initializing SPI driver at 3.2MHz");
+    //info!("Initializing SPI driver at 3.2MHz");
+    info!("Initializing SPI driver");
 
     let dma = esp_hal::dma::Dma::new(dma);
     let dma_channel_0 = dma.channel0.configure(true, DmaPriority::Priority9);
     let spi = esp_hal::spi::master::Spi::new(
         spi,
-        3_200.kHz(),
+        3_800.kHz(),
         SpiMode::Mode0,
         &clocks,
     )
@@ -198,8 +203,8 @@ async fn led_task(
 
     let spi_driver = esp_hal::spi::master::SpiDmaBus::new(spi, tx_dma, rx_dma);
 
-    let mut led_buffer = [0_u8; (LED_COUNT * 12) + 40];
-    let mut ws = Ws2812::new(spi_driver, &mut led_buffer);
+    let mut led_buffer = [0_u8; (LED_COUNT * 24) + 40];
+    let mut ws = Ws2812::new_sk6812w(spi_driver, &mut led_buffer);
 
     info!("WS2812 driver started on SPI2 and GPIO8.");
 
@@ -248,12 +253,15 @@ async fn led_task(
             //     smart_leds::gamma(data.iter().cloned()),
             //     BRIGHTNESS,
             // );
-            let rgb_values = strip.to_rgb8();
-            let gamma_corrected = smart_leds::gamma(rgb_values.iter().cloned());
+            //let rgb_values = strip.to_rgb8();
+            let rgb_values = strip.to_rgbw();
+            //let gamma_corrected = smart_leds::gamma(rgb_values.iter().cloned());
 
+            let pre_write_ms = current_millis();
             critical_section::with(|_| {
-                ws.write(gamma_corrected).unwrap();
+                ws.write(rgb_values).expect("failed LED update")
             });
+            debug!("LED critical section in {} ms", current_millis() - pre_write_ms);
 
             let effect_runtime = (current_millis() - last_effect_millis) as i64;
             last_effect_millis = current_millis();
